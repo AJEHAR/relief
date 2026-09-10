@@ -74,7 +74,12 @@ export function isLoggedIn() {
 onAuthStateChanged(auth, async (user) => {
   authState.user = user;
   if (user) {
-    authState.profile = await ensureUserProfile(user);
+    try {
+      authState.profile = await ensureUserProfile(user);
+    } catch (e) {
+      console.error('Gagal cipta/muat profil pengguna:', e);
+      authState.profile = { email: user.email || '', name: user.displayName || '', photoURL: user.photoURL || '', role: 'pending', teacherId: null, _error: e.message };
+    }
   } else {
     authState.profile = null;
   }

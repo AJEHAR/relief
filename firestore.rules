@@ -10,6 +10,16 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
+    // Senarai emel admin permulaan — KEKALKAN SAMA dgn BOOTSTRAP_ADMIN_EMAILS
+    // dalam js/firebase-config.js. Perlu untuk selesaikan masalah "ayam & telur":
+    // profil pengguna belum wujud lagi semasa first-login, jadi isAdmin() di atas
+    // tak boleh disemak — rule ni benarkan create SEBAGAI admin terus untuk emel
+    // yang disenaraikan sahaja.
+    function isBootstrapAdmin() {
+      return isSignedIn() && request.auth.token.email in [
+        'azharuddinhaniff@gmail.com'
+      ];
+    }
 
     // ── Data awam (boleh baca semua) — hanya admin boleh tulis ──
     match /teachers/{id} {
@@ -40,10 +50,15 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       // Pengguna cipta profil sendiri sekali sahaja (first login), TIDAK boleh
-      // tetapkan role sendiri jadi 'admin' — hanya 'pending' dibenarkan semasa create.
+      // tetapkan role sendiri jadi 'admin' — kecuali emel dia dalam senarai
+      // isBootstrapAdmin() (utk elak masalah "ayam & telur" admin pertama),
+      // atau sedia ada admin lain yang buat panggilan (jarang berlaku sebab
+      // create hanya utk uid sendiri).
       allow create: if isSignedIn() && request.auth.uid == uid
-                    && request.resource.data.role in ['pending', 'admin']
-                    && (request.resource.data.role != 'admin' || isAdmin());
+                    && (
+                         request.resource.data.role == 'pending'
+                         || (request.resource.data.role == 'admin' && isBootstrapAdmin())
+                       );
 
       // Update field 'teacherId' — pengguna sendiri sahaja (pautan nama guru, ggview).
       allow update: if isSignedIn() && request.auth.uid == uid
