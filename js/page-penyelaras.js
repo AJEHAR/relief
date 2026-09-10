@@ -1,0 +1,459 @@
+import { initNav, gatePage } from './nav.js';
+import * as db from './db.js';
+import { loadStaticLists } from './shared-data.js';
+import { getReliefFromAssignment } from './board-engine.js';
+import { exportHtmlToPdf } from './pdf-export.js';
+import { $, esc, escJs, todayStr, toast, showConfirm } from './ui-utils.js';
+
+initNav('penyelaras');
+
+let teachersList = [];
+let currentBoard = null;
+let currentAssignSlot = null;
+let overrideOn = false;
+let currentSub = 'papan';
+
+function getDate() { return $('datePicker').value; }
+
+function switchSub(sub) {
+  currentSub = sub;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
+  ['papan', 'senarai', 'sejarah'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
+  if (sub === 'papan') loadPapan();
+  else if (sub === 'senarai') { renderSenaraiXml(); loadExtraTeachersAdmin(); }
+  else if (sub === 'sejarah') loadHistory();
+}
+
+async function onDateChange() {
+  if (currentSub === 'papan') await loadPapan();
+  else if (currentSub === 'sejarah') await loadHistory();
+}
+
+// ═══════════════════════════════════════════════════════════
+// PAPAN
+// ═══════════════════════════════════════════════════════════
+async function loadPapan() {
+  $('papan-loading').classList.remove('hidden');
+  $('papan-content').classList.add('hidden');
+  try {
+    currentBoard = await db.getDailyBoard(getDate());
+    populateAbsentSelect();
+    renderAbsentPanel();
+    renderTimetableGrid();
+    renderBoardStatus();
+    $('papan-loading').classList.add('hidden');
+    $('papan-content').classList.remove('hidden');
+  } catch (e) {
+    $('papan-loading').classList.add('hidden');
+    toast('Ralat memuat papan: ' + e.message, 'error');
+  }
+}
+
+function populateAbsentSelect() {
+  const sel = $('absent-teacher-select');
+  const absentSet = new Set(currentBoard.absentIds || []);
+  const avail = teachersList.filter(t => !absentSet.has(t.id)).sort((a, b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">— Pilih Guru —</option>' + avail.map(t => `<option value="${esc(t.id)}">${esc(t.name)}${t.short ? ' (' + esc(t.short) + ')' : ''}</option>`).join('');
+}
+
+function renderBoardStatus() {
+  const chip = $('board-status-chip');
+  const confirmed = currentBoard.status === 'confirmed';
+  chip.innerHTML = `<span class="status-chip ${confirmed ? 'confirmed' : 'draft'}"><i class="fas ${confirmed ? 'fa-check-circle' : 'fa-pen'}"></i> ${confirmed ? 'Disahkan' : 'Draf'}</span>`;
+}
+
+function renderAbsentPanel() {
+  const wrap = $('absent-tags-container');
+  const ids = currentBoard.absentIds || [];
+  if (!ids.length) { wrap.innerHTML = `<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Tiada guru ditanda tidak hadir.</div>`; return; }
+  wrap.innerHTML = ids.map(id => {
+    const t = teachersList.find(x => x.id === id) || { name: id };
+    const reason = (currentBoard.absentReasons || {})[id] || '—';
+    return `<span class="absent-tag" style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:20px;padding:6px 10px;font-size:.75rem;font-weight:700;margin:0 6px 6px 0;">
+      <i class="fas fa-user-slash" style="font-size:.65rem;"></i> ${esc(t.name)} <span style="font-weight:500;opacity:.75;">(${esc(reason)})</span>
+      <button data-remove-id="${esc(id)}" class="btn-remove-absent" style="background:none;border:none;color:#b91c1c;cursor:pointer;padding:0 2px;"><i class="fas fa-times"></i></button>
+    </span>`;
+  }).join('');
+  wrap.querySelectorAll('.btn-remove-absent').forEach(btn => btn.addEventListener('click', () => removeAbsent(btn.dataset.removeId)));
+}
+
+async function addAbsent() {
+  const id = $('absent-teacher-select').value;
+  const reason = $('absent-reason-select').value;
+  if (!id) return toast('Sila pilih guru.', 'error');
+  if (!reason) return toast('Sila pilih sebab ketidakhadiran.', 'error');
+  const res = await db.addAbsentTeacher({ date: getDate(), teacherId: id, reason });
+  if (!res.success) return toast(res.message, 'error');
+  currentBoard = res;
+  populateAbsentSelect(); renderAbsentPanel(); renderTimetableGrid();
+  $('absent-reason-select').value = '';
+  toast('Guru ditanda tidak hadir.', 'success');
+}
+
+function removeAbsent(teacherId) {
+  const t = teachersList.find(x => x.id === teacherId);
+  showConfirm({
+    title: 'Buang Tanda Tidak Hadir', msg: `Buang ${t ? t.name : teacherId} dari senarai tidak hadir? Tugasan guru ganti berkaitan akan turut dipadam.`,
+    okLabel: 'Buang', okType: 'warn',
+    onOk: async () => {
+      const res = await db.removeAbsentTeacher({ date: getDate(), teacherId });
+      if (!res.success) return toast(res.message, 'error');
+      currentBoard = res;
+      populateAbsentSelect(); renderAbsentPanel(); renderTimetableGrid();
+      toast('Ditanggalkan.', 'success');
+    }
+  });
+}
+
+function renderTimetableGrid() {
+  const container = $('timetable-container');
+  const statBar = $('slot-stat-bar');
+  const board = currentBoard;
+  const periods = board.periods || [];
+  const classes = board.classes || [];
+
+  if (!periods.length || !classes.length) {
+    container.innerHTML = `<div class="state-box" style="border-radius:0;border:none;">
+      <div class="state-icon"><i class="fas fa-table"></i></div>
+      <div class="state-title">Jadual Tiada Data</div>
+      <div class="state-sub">Tiada data jadual untuk hari ini. Sila muat naik jadual XML dahulu (tab Admin).</div>
+    </div>`;
+    statBar.style.display = 'none';
+    return;
+  }
+
+  const guruMap = {};
+  if (board.teacherMap) {
+    Object.entries(board.teacherMap).forEach(([tid, data]) => {
+      const slots = {};
+      periods.forEach(p => {
+        if (p.id === 'REHAT') return;
+        const slotArr = data[p.id];
+        if (slotArr && slotArr.length) slots[p.id] = slotArr;
+      });
+      if (Object.keys(slots).length > 0) guruMap[tid] = { name: data.name, id: tid, slots };
+    });
+  }
+
+  const absentSet = new Set(board.absentIds || []);
+  const guruList = Object.values(guruMap).sort((a, b) => {
+    const aA = absentSet.has(a.id), bA = absentSet.has(b.id);
+    if (aA && !bA) return -1;
+    if (!aA && bA) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  let statPending = 0, statDone = 0, statNormal = 0;
+  guruList.forEach(g => {
+    periods.forEach(p => {
+      if (p.id === 'REHAT') return;
+      (g.slots[p.id] || []).forEach(cell => {
+        if (!absentSet.has(g.id)) { statNormal++; return; }
+        if (!cell.reliefTeacher) statPending++; else statDone++;
+      });
+    });
+  });
+  $('stat-pending').textContent = statPending + ' slot belum isi';
+  $('stat-done').textContent = statDone + ' slot dah isi';
+  $('stat-normal').textContent = statNormal + ' slot biasa';
+  statBar.style.display = 'flex';
+
+  const reliefDutyMap = {};
+  Object.entries(board.assignments || {}).forEach(([key, val]) => {
+    const reliefName = getReliefFromAssignment(val).relief;
+    if (!reliefName) return;
+    const periodId = key.split('|')[1];
+    if (!reliefDutyMap[reliefName]) reliefDutyMap[reliefName] = new Set();
+    reliefDutyMap[reliefName].add(periodId);
+  });
+
+  let html = '<table class="tt-table"><thead><tr class="tt-head-row">';
+  html += `<th class="tt-sticky tt-head-guru">GURU</th>`;
+  periods.forEach(p => {
+    if (p.id === 'REHAT') html += `<th class="tt-head-rehat">☕<div style="font-size:.5rem;margin-top:2px;">Rehat</div></th>`;
+    else html += `<th class="tt-head-period"><div class="tt-head-period-num">Wkt ${esc(p.id)}</div><div class="tt-head-period-time">${esc(p.start)}</div><div class="tt-head-period-time">${esc(p.end)}</div></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  guruList.forEach(g => {
+    const isAbsent = absentSet.has(g.id);
+    const reason = (board.absentReasons || {})[g.id] || '';
+    const nameParts = g.name.split(' ');
+    const shortName = nameParts.length > 3 ? nameParts.slice(0, 3).join(' ') + '…' : g.name;
+
+    html += `<tr><td class="tt-sticky tt-guru-cell ${isAbsent ? 'tt-guru-absent' : ''}">
+      <span class="tt-guru-name">${esc(shortName)}</span>
+      ${isAbsent ? `<span class="tt-guru-tag" title="${esc(reason)}">✗ ${esc(reason) || 'Tak Hadir'}</span>` : ''}
+    </td>`;
+
+    periods.forEach(p => {
+      if (p.id === 'REHAT') { html += `<td class="tt-slot s-rehat"><div class="tt-slot-inner"><div class="tt-rehat-inner"><div class="tt-rehat-text">Rehat</div></div></div></td>`; return; }
+      const cells = g.slots[p.id] || [];
+      const isOnReliefDuty = reliefDutyMap[g.name]?.has(String(p.id));
+
+      if (!cells.length) {
+        if (isOnReliefDuty) {
+          const dutyClass = Object.entries(board.assignments || {}).find(([k, v]) => getReliefFromAssignment(v).relief === g.name && k.split('|')[1] === String(p.id));
+          const dutyClassName = dutyClass ? dutyClass[0].split('|')[2] : '?';
+          html += `<td class="tt-slot s-relief-duty"><div class="tt-slot-inner"><div class="tt-slot-subj">📌 Relief</div><div class="tt-slot-duty-badge"><i class="fas fa-arrow-right" style="font-size:.4rem;"></i>${esc(dutyClassName)}</div></div></td>`;
+        } else {
+          html += `<td class="tt-slot s-empty"><div class="tt-slot-inner"></div></td>`;
+        }
+        return;
+      }
+
+      const cell = cells[0];
+      if (!isAbsent) {
+        const isOverride = reliefDutyMap[g.name]?.has(String(p.id));
+        if (isOverride) {
+          const dutyEntry = Object.entries(board.assignments || {}).find(([k, v]) => getReliefFromAssignment(v).relief === g.name && k.split('|')[1] === String(p.id));
+          const dutyClass = dutyEntry ? dutyEntry[0].split('|')[2] : '?';
+          html += `<td class="tt-slot s-override"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div><div class="tt-slot-override-badge">⚠️ +Relief ${esc(dutyClass)}</div></div></td>`;
+        } else {
+          html += `<td class="tt-slot s-normal"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div></div></td>`;
+        }
+        return;
+      }
+
+      let slotClass = cell.reliefTeacher ? 's-done' : 's-absent';
+      let reliefHtml = '';
+      if (cell.reliefTeacher) {
+        const rParts = cell.reliefTeacher.split(' ');
+        const rShort = rParts.length > 2 ? rParts[0] + ' ' + rParts[1] : cell.reliefTeacher;
+        const noteIcon = cell.note ? `<span class="tt-slot-note-icon">📝</span>` : '';
+        reliefHtml = `<div class="tt-slot-relief"><i class="fas fa-check" style="font-size:.45rem;"></i>${esc(rShort)}${noteIcon}</div>`;
+      } else {
+        reliefHtml = `<div class="tt-slot-add"><i class="fas fa-plus" style="font-size:.45rem;"></i>Isi</div>`;
+      }
+      html += `<td class="tt-slot ${slotClass}" data-assign-key="${escJs(cell.assignKey)}"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div>${reliefHtml}</div></td>`;
+    });
+    html += `</tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+  container.querySelectorAll('.tt-slot[data-assign-key]').forEach(td => td.addEventListener('click', () => openAssignModal(td.dataset.assignKey)));
+}
+
+// ── Assign modal ──
+function openAssignModal(assignKey) {
+  const [teacherId, periodId, className] = assignKey.split('|');
+  currentAssignSlot = { assignKey, teacherId, periodId, className };
+  overrideOn = false;
+  $('override-toggle').checked = false;
+  const existing = currentBoard.assignments?.[assignKey];
+  const { note } = getReliefFromAssignment(existing);
+  $('assign-note').value = note || '';
+  $('assign-search').value = '';
+  $('assign-modal-title').textContent = `Guru Ganti — ${className} · Wkt ${periodId}`;
+  renderAssignList();
+  $('assignModal').classList.remove('hidden');
+}
+function closeAssignModal() { $('assignModal').classList.add('hidden'); currentAssignSlot = null; }
+function toggleOverride() { overrideOn = $('override-toggle').checked; renderAssignList(); }
+
+function renderAssignList() {
+  if (!currentAssignSlot) return;
+  const { periodId, assignKey } = currentAssignSlot;
+  const q = ($('assign-search').value || '').trim().toLowerCase();
+  const availList = currentBoard.periodAvailMap?.[periodId] || [];
+  const currentRelief = getReliefFromAssignment(currentBoard.assignments?.[assignKey]).relief;
+
+  const reliefBusySet = new Set();
+  Object.entries(currentBoard.assignments || {}).forEach(([key, val]) => {
+    const name = getReliefFromAssignment(val).relief;
+    if (!name) return;
+    if (key.split('|')[1] === periodId && key !== assignKey) reliefBusySet.add(name);
+  });
+
+  let pool = overrideOn ? teachersList.map(t => availList.find(a => a.id === t.id) || { ...t, freeSlots: '—', busyPeriods: '—', reliefCount: 0 }) : availList.filter(t => !reliefBusySet.has(t.name));
+  if (q) pool = pool.filter(t => t.name.toLowerCase().includes(q));
+  pool = [...pool].sort((a, b) => (b.freeSlots === '—' ? -1 : b.freeSlots) - (a.freeSlots === '—' ? -1 : a.freeSlots));
+
+  $('assign-available-list').innerHTML = pool.length ? pool.map(t => {
+    const isSelected = currentRelief === t.name;
+    const isBusyRelief = reliefBusySet.has(t.name);
+    const isAbsent = (currentBoard.absentIds || []).includes(t.id);
+    const clickable = overrideOn ? true : (!isAbsent && !isBusyRelief);
+    return `<div class="assign-teacher-card ${isSelected ? 'selected' : ''}" style="${!clickable ? 'opacity:.5;' : 'cursor:pointer;'}" data-select-name="${clickable ? esc(t.name) : ''}">
+      <div style="flex:1;min-width:0;">
+        <div class="assign-teacher-name">${esc(t.name)}</div>
+        <div class="assign-teacher-stats">
+          <span class="assign-stat-chip assign-stat-free">${t.freeSlots ?? '—'} bebas</span>
+          <span class="assign-stat-chip assign-stat-busy">${t.busyPeriods ?? '—'} mengajar</span>
+          ${t.reliefCount ? `<span class="assign-stat-chip assign-stat-relief">${t.reliefCount}× relief</span>` : ''}
+          ${isAbsent ? `<span class="assign-stat-chip assign-stat-busy">✗ Tidak Hadir</span>` : ''}
+          ${isBusyRelief ? `<span class="assign-stat-chip assign-stat-busy">📌 Relief lain</span>` : ''}
+        </div>
+      </div>
+      ${clickable ? `<button class="btn-assign ${isSelected ? 'selected' : ''}" data-select-name="${esc(t.name)}">${isSelected ? '<i class="fas fa-check"></i>' : '<i class="fas fa-hand-pointer"></i>'}</button>` : ''}
+    </div>`;
+  }).join('') : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:.85rem;">Tiada guru sepadan.</div>`;
+
+  $('assign-available-list').querySelectorAll('[data-select-name]').forEach(el => {
+    if (el.dataset.selectName) el.addEventListener('click', (ev) => { ev.stopPropagation(); selectTeacher(el.dataset.selectName); });
+  });
+}
+
+async function selectTeacher(teacherName) {
+  if (!currentAssignSlot) return;
+  const note = $('assign-note').value.trim();
+  const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: teacherName, note });
+  if (!res.success) return toast('Gagal simpan: ' + res.message, 'error');
+  currentBoard = res;
+  renderTimetableGrid(); closeAssignModal(); renderBoardStatus();
+  toast(`${teacherName} dipilih sebagai guru ganti.`, 'success');
+}
+async function clearAssignment() {
+  if (!currentAssignSlot) return;
+  const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: '', note: '' });
+  if (!res.success) return toast('Gagal: ' + res.message, 'error');
+  currentBoard = res;
+  renderTimetableGrid(); closeAssignModal();
+}
+async function saveNoteOnly() {
+  if (!currentAssignSlot) return;
+  const note = $('assign-note').value.trim();
+  const existing = getReliefFromAssignment(currentBoard.assignments?.[currentAssignSlot.assignKey]).relief;
+  const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: existing, note });
+  if (!res.success) return toast('Gagal: ' + res.message, 'error');
+  currentBoard = res;
+  renderTimetableGrid(); closeAssignModal();
+  toast('Catatan disimpan.', 'success');
+}
+
+function confirmBoard() {
+  showConfirm({
+    title: 'Sahkan Tapak Harian', msg: 'Selepas disahkan, jadual akan dipaparkan sebagai muktamad di Jadual Ganti & Ruang Guru. Teruskan?',
+    okLabel: 'Sahkan', okType: 'primary',
+    onOk: async () => {
+      const res = await db.confirmDailyBoard({ date: getDate() });
+      if (!res.success) return toast(res.message, 'error');
+      toast(res.message, 'success');
+      await loadPapan();
+    }
+  });
+}
+
+async function generatePdf() {
+  if (!currentBoard) return;
+  const ids = currentBoard.absentIds || [];
+  let rows = '';
+  ids.forEach(tid => {
+    const t = teachersList.find(x => x.id === tid) || { name: tid };
+    const slotsByPeriod = currentBoard.teacherMap?.[tid] || {};
+    Object.keys(slotsByPeriod).filter(k => k !== 'name' && k !== 'id').forEach(pid => {
+      (slotsByPeriod[pid] || []).forEach(slot => {
+        const period = (currentBoard.periods || []).find(p => p.id === pid) || {};
+        rows += `<tr><td>${esc(pid)}</td><td>${esc(period.start || '')}–${esc(period.end || '')}</td><td>${esc(slot.className)}</td><td>${esc(slot.subject) || '—'}</td>
+          <td>${esc(t.name)}</td><td class="${slot.reliefTeacher ? 'green' : 'red'}">${esc(slot.reliefTeacher) || 'BELUM DITETAPKAN'}</td><td>${esc(slot.note) || ''}</td></tr>`;
+      });
+    });
+  });
+  const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(currentBoard.dayName || '')}</div>
+    <div class="pdf-sub">${esc(getDate())}</div>
+    <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
+  await exportHtmlToPdf(html, `Jadual_Guru_Ganti_${getDate()}`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SENARAI NAMA GURU
+// ═══════════════════════════════════════════════════════════
+function renderSenaraiXml() {
+  const wrap = $('senarai-xml-list');
+  const xmlTeachers = teachersList.filter(t => !String(t.id).startsWith('EXTRA_')).sort((a, b) => a.name.localeCompare(b.name));
+  $('senarai-count-sub').textContent = `${xmlTeachers.length} guru dari jadual XML`;
+  if (!xmlTeachers.length) { wrap.innerHTML = `<div style="color:var(--muted);font-size:.8rem;">Tiada data — sila muat naik jadual XML dahulu di tab Admin.</div>`; return; }
+  wrap.innerHTML = `<div class="table-wrap"><table class="m-table"><thead><tr><th>Nama</th><th>Singkatan</th><th>ID</th></tr></thead><tbody>
+    ${xmlTeachers.map(t => `<tr><td style="font-weight:700;">${esc(t.name)}</td><td>${esc(t.short) || '—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--muted);">${esc(t.id)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+async function loadExtraTeachersAdmin() {
+  const wrap = $('extra-teacher-list');
+  wrap.innerHTML = 'Memuatkan...';
+  const list = await db.getExtraTeachers();
+  if (!list.length) { wrap.innerHTML = `<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Tiada guru tambahan.</div>`; return; }
+  wrap.innerHTML = list.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+    <div><strong>${esc(t.name)}</strong> ${t.short ? '<span style="color:var(--muted);font-size:.75rem;">(' + esc(t.short) + ')</span>' : ''}</div>
+    <button class="btn-ghost btn-sm btn-del-extra" data-id="${esc(t.id)}" style="color:#dc2626;"><i class="fas fa-trash"></i></button></div>`).join('');
+  wrap.querySelectorAll('.btn-del-extra').forEach(btn => btn.addEventListener('click', () => deleteExtraTeacherAction(btn.dataset.id)));
+}
+async function addExtraTeacherAction() {
+  const name = $('extraTeacherName').value.trim();
+  const short = $('extraTeacherShort').value.trim();
+  const res = await db.addExtraTeacher({ name, short });
+  if (!res.success) return toast(res.message, 'error');
+  $('extraTeacherName').value = ''; $('extraTeacherShort').value = '';
+  const lists = await loadStaticLists(); teachersList = lists.teachersList;
+  renderSenaraiXml(); await loadExtraTeachersAdmin();
+  toast('Guru ditambah.', 'success');
+}
+function deleteExtraTeacherAction(id) {
+  showConfirm({
+    title: 'Padam Guru', msg: 'Padam guru tambahan ini?', okLabel: 'Padam', okType: 'warn',
+    onOk: async () => {
+      const res = await db.deleteExtraTeacher(id);
+      if (!res.success) return toast(res.message, 'error');
+      const lists = await loadStaticLists(); teachersList = lists.teachersList;
+      renderSenaraiXml(); await loadExtraTeachersAdmin();
+      toast('Dipadam.', 'success');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEJARAH
+// ═══════════════════════════════════════════════════════════
+async function loadHistory() {
+  $('history-container').innerHTML = `<div class="card"><div class="state-box"><div class="spinner"></div><div class="s-sub">Memuatkan data...</div></div></div>`;
+  try {
+    const records = await db.getReliefByDate(getDate());
+    renderHistory(records);
+  } catch (e) { $('history-container').innerHTML = `<div class="card"><div class="state-box"><div class="s-sub">${esc(e.message)}</div></div></div>`; }
+}
+function renderHistory(records) {
+  const ct = $('history-container');
+  if (!records.length) { ct.innerHTML = `<div class="card"><div class="state-box"><div class="s-icon">🗂️</div><div class="s-title">Tiada Rekod</div><div class="s-sub">Tiada rekod guru ganti disahkan untuk tarikh ini.</div></div></div>`; return; }
+  let h = `<div class="card"><div class="table-wrap"><table class="m-table"><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>`;
+  records.forEach(r => {
+    h += `<tr><td>${esc(r.period)}</td><td>${esc(r.time)}</td><td>${esc(r.className)}</td><td>${esc(r.subject)}</td><td>${esc(r.absentTeacher)}</td><td>${esc(r.reliefTeacher)}</td><td>${esc(r.note) || '—'}</td></tr>`;
+  });
+  h += `</tbody></table></div></div>`;
+  ct.innerHTML = h;
+}
+async function printArchive() {
+  const records = await db.getReliefByDate(getDate());
+  if (!records.length) return toast('Tiada rekod untuk dieksport.', 'error');
+  let rows = records.map(r => `<tr><td>${esc(r.period)}</td><td>${esc(r.time)}</td><td>${esc(r.className)}</td><td>${esc(r.subject)}</td><td>${esc(r.absentTeacher)}</td><td class="green">${esc(r.reliefTeacher)}</td><td>${esc(r.note) || ''}</td></tr>`).join('');
+  const html = `<div class="pdf-title">Arkib Guru Ganti</div><div class="pdf-sub">${esc(getDate())}</div>
+    <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
+  await exportHtmlToPdf(html, `Arkib_Guru_Ganti_${getDate()}`);
+}
+
+// ═══════════════════════════════════════════════════════════
+gatePage('admin', async () => {
+  const lists = await loadStaticLists();
+  teachersList = lists.teachersList;
+
+  $('datePicker').value = todayStr();
+  $('datePicker').addEventListener('change', onDateChange);
+  $('btn-refresh').addEventListener('click', onDateChange);
+  $('btn-add-absent').addEventListener('click', addAbsent);
+  $('btn-gen-pdf').addEventListener('click', generatePdf);
+  $('btn-confirm-board').addEventListener('click', confirmBoard);
+  $('btn-add-extra').addEventListener('click', addExtraTeacherAction);
+  $('btn-print-archive').addEventListener('click', printArchive);
+  $('btn-close-assign').addEventListener('click', closeAssignModal);
+  $('btn-clear-assign').addEventListener('click', clearAssignment);
+  $('btn-save-note').addEventListener('click', saveNoteOnly);
+  $('override-toggle').addEventListener('change', toggleOverride);
+  $('assign-search').addEventListener('input', renderAssignList);
+
+  switchSub('papan');
+});
+
+window.PGGPage = { switchSub };
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}

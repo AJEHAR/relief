@@ -1,6 +1,33 @@
 # Sistem Guru Ganti — relief.syazr.com
 
-App bersatu (gantikan `gg-main` + `ggview-main`), guna **Firebase** (Firestore + Authentication Google). Tiada server/Cloud Functions — semua logik jalan di browser.
+**Struktur 4 halaman + subpage**, guna **Firebase** (Firestore + Authentication Google). Tiada server/Cloud Functions — semua logik jalan di browser.
+
+## Struktur Halaman
+
+```
+index.html          → Jadual Ganti           (AWAM, tiada login)
+ruang-guru.html      → Ruang Guru             (perlu LOGIN)
+                        ├─ subpage: Jadual Saya
+                        └─ subpage: Kelas
+penyelaras.html      → Penyelaras GG          (perlu ADMIN)
+                        ├─ subpage: Papan
+                        ├─ subpage: Senarai Nama Guru
+                        └─ subpage: Sejarah
+admin.html           → Admin                  (perlu ADMIN)
+                        ├─ subpage: XML ASC
+                        ├─ subpage: Upload Logo
+                        └─ subpage: Pengurusan Pengguna
+```
+
+Nav atas (desktop, lebar ≥900px) papar semua 4 link (yang tak layak disorok automatik). Skrin sempit (tablet/phone, <900px) papar ikon ☰ yang buka **menu tepi (drawer)** dengan link yang sama.
+
+## Fail JS penting
+
+- `js/nav.js` — navbar + drawer dikongsi semua page, + fungsi `gatePage()` (kunci akses ikut public/login/admin)
+- `js/ui-utils.js` — helper dikongsi ($, esc, toast, showConfirm, dll)
+- `js/shared-data.js` — muat senarai guru & kelas (dikongsi Ruang Guru & Penyelaras)
+- `js/page-jadual.js`, `js/page-ruang-guru.js`, `js/page-penyelaras.js`, `js/page-admin.js` — logik khusus setiap halaman
+- `js/auth.js`, `js/db.js`, `js/board-engine.js`, `js/xml-import.js`, `js/pdf-export.js`, `js/firebase-init.js`, `js/firebase-config.js` — tidak berubah
 
 ## 1. Setup Firebase (sekali sahaja)
 

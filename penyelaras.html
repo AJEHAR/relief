@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Penyelaras GG — Sistem Guru Ganti</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f2044">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/relief-extra.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<div id="nav-root"></div>
+
+<div class="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" data-sub="papan" onclick="PGGPage.switchSub('papan')"><i class="fas fa-clipboard-list"></i> Papan</button>
+    <button class="tab-btn" data-sub="senarai" onclick="PGGPage.switchSub('senarai')"><i class="fas fa-users"></i> Senarai Nama Guru</button>
+    <button class="tab-btn" data-sub="sejarah" onclick="PGGPage.switchSub('sejarah')"><i class="fas fa-archive"></i> Sejarah</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="page-gate"></div>
+  <div id="page-content" class="hidden">
+
+    <div class="date-row">
+      <input type="date" id="datePicker" class="date-input">
+      <button class="btn-refresh" id="btn-refresh"><i class="fas fa-sync-alt"></i> Muat Semula</button>
+    </div>
+
+    <!-- SUBPAGE: Papan -->
+    <div id="sub-papan" class="fade-in">
+      <div id="papan-loading" class="hidden state-box"><div class="spinner"></div><div class="s-sub">Memuatkan...</div></div>
+      <div id="papan-content" class="hidden fade-in">
+        <div class="card">
+          <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#dc2626,#b91c1c);"><i class="fas fa-user-slash"></i></div>
+            <div><div class="card-head-title">Tandakan Guru Tidak Hadir</div><div class="card-head-sub">Pilih guru & sebab ketidakhadiran</div></div></div>
+          <div class="card-body">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+              <select id="absent-teacher-select" class="input-field" style="flex:2;min-width:180px;"></select>
+              <select id="absent-reason-select" class="input-field" style="flex:1;min-width:160px;">
+                <option value="">— Sebab —</option>
+                <option>Urusan Rasmi</option><option>Cuti</option><option>Keluar Waktu Bekerja</option>
+              </select>
+              <button class="btn btn-primary btn-sm" id="btn-add-absent"><i class="fas fa-plus"></i> Tambah</button>
+            </div>
+            <div id="absent-tags-container" class="absent-tags"></div>
+          </div>
+        </div>
+
+        <div class="timetable-wrap" id="timetable-wrap">
+          <div class="timetable-toolbar">
+            <div class="timetable-title"><i class="fas fa-th" style="color:var(--teal);"></i> Jadual Induk Harian</div>
+            <div class="timetable-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>Biasa</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--danger);"></div>Tak Hadir</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--success);"></div>Dah Isi</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#ea580c;"></div>Sedang Relief</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#2563eb;outline:2px solid #ea580c;outline-offset:1px;"></div>Override</div>
+            </div>
+          </div>
+          <div class="timetable-scroll">
+            <div id="timetable-container">
+              <div class="state-box" style="border-radius:0;border:none;">
+                <div class="state-icon"><i class="fas fa-table"></i></div>
+                <div class="state-title">Jadual Kosong</div>
+                <div class="state-sub">Tandakan guru tidak hadir untuk lihat jadual</div>
+              </div>
+            </div>
+          </div>
+          <div class="absent-stat" id="slot-stat-bar" style="display:none;">
+            <div class="absent-stat-item"><div class="legend-dot" style="background:var(--danger);border-radius:50%;width:10px;height:10px;"></div><span id="stat-pending">0 slot belum isi</span></div>
+            <div class="absent-stat-item"><div class="legend-dot" style="background:var(--success);border-radius:50%;width:10px;height:10px;"></div><span id="stat-done">0 slot dah isi</span></div>
+            <div class="absent-stat-item"><div class="legend-dot" style="background:#3b82f6;border-radius:50%;width:10px;height:10px;"></div><span id="stat-normal">0 slot biasa</span></div>
+          </div>
+        </div>
+
+        <div class="card" id="confirm-card">
+          <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;align-items:center;">
+            <div id="board-status-chip"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-success btn-sm" id="btn-gen-pdf"><i class="fas fa-file-pdf"></i> Jana PDF</button>
+              <button class="btn btn-primary btn-sm" id="btn-confirm-board"><i class="fas fa-check-circle"></i> Sahkan Tapak</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBPAGE: Senarai Nama Guru -->
+    <div id="sub-senarai" class="hidden fade-in">
+      <div class="card">
+        <div class="card-head"><div class="card-head-icon"><i class="fas fa-users"></i></div>
+          <div><div class="card-head-title">Senarai Guru (dari Jadual XML)</div><div class="card-head-sub" id="senarai-count-sub">—</div></div></div>
+        <div class="card-body"><div id="senarai-xml-list">Memuatkan...</div></div>
+      </div>
+      <div class="card admin-section">
+        <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);"><i class="fas fa-user-plus"></i></div>
+          <div><div class="card-head-title">Guru Tambahan</div><div class="card-head-sub">Guru yang tiada dalam jadual ASC</div></div></div>
+        <div class="card-body">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <input type="text" id="extraTeacherName" placeholder="Nama penuh guru..." class="input-field" style="flex:2;min-width:140px;">
+            <input type="text" id="extraTeacherShort" placeholder="Singkatan" class="input-field" style="flex:1;min-width:80px;max-width:110px;">
+            <button class="btn btn-primary btn-sm" id="btn-add-extra"><i class="fas fa-plus"></i> Tambah</button>
+          </div>
+          <div id="extra-teacher-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBPAGE: Sejarah -->
+    <div id="sub-sejarah" class="hidden fade-in">
+      <div class="card">
+        <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div style="font-weight:700;color:var(--navy);">Arkib Guru Ganti</div>
+          <button class="btn btn-success btn-sm" id="btn-print-archive"><i class="fas fa-file-pdf"></i> Jana PDF</button>
+        </div>
+      </div>
+      <div id="history-container"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODALS -->
+<div id="assignModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head"><div id="assign-modal-title">Tetapkan Guru Ganti</div><button id="btn-close-assign" class="modal-x"><i class="fas fa-times"></i></button></div>
+    <div class="modal-body">
+      <input type="text" id="assign-search" class="input-field" placeholder="Cari nama guru..." style="margin-bottom:10px;">
+      <div id="assign-available-list" class="assign-teacher-list"></div>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:.8rem;">
+        <input type="checkbox" id="override-toggle"> Papar semua guru (termasuk yang sibuk)
+      </label>
+      <textarea id="assign-note" class="input-field" placeholder="Catatan (pilihan)..." style="margin-top:10px;width:100%;min-height:60px;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-ghost btn-sm" id="btn-clear-assign"><i class="fas fa-times"></i> Kosongkan</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-note"><i class="fas fa-save"></i> Simpan Catatan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="confirmModal" class="confirm-overlay hidden">
+  <div class="confirm-box">
+    <div id="confirm-title" class="confirm-title">Sahkan</div>
+    <div id="confirm-msg" class="confirm-msg"></div>
+    <div class="confirm-actions">
+      <button id="confirm-cancel-btn" class="confirm-btn confirm-btn-cancel">Batal</button>
+      <button id="confirm-ok-btn" class="confirm-btn confirm-btn-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="js/page-penyelaras.js"></script>
+</body>
+</html>

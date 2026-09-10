@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ruang Guru — Sistem Guru Ganti</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f2044">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/relief-extra.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+
+<div class="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" data-sub="saya" onclick="RGPage.switchSub('saya')"><i class="fas fa-user"></i> Jadual Saya</button>
+    <button class="tab-btn" data-sub="kelas" onclick="RGPage.switchSub('kelas')"><i class="fas fa-door-open"></i> Kelas</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="page-gate"></div>
+  <div id="page-content" class="hidden">
+
+    <div class="date-row">
+      <input type="date" id="datePicker" class="date-input">
+      <button class="btn-refresh" id="btn-refresh"><i class="fas fa-sync-alt"></i> Muat Semula</button>
+    </div>
+
+    <!-- SUBPAGE: Jadual Saya -->
+    <div id="sub-saya" class="fade-in">
+      <div id="saya-pickname" class="card">
+        <div class="card-head"><div class="card-head-icon"><i class="fas fa-user-search"></i></div>
+          <div><div class="card-head-title">Pilih Nama Anda</div><div class="card-head-sub">Sekali sahaja — akan diingati untuk lepas ini</div></div></div>
+        <div class="card-body" style="position:relative;">
+          <div class="search-outer" id="search-outer">
+            <div class="search-field">
+              <i class="fas fa-search si-left"></i>
+              <input type="text" id="tsearch" class="search-input" placeholder="Taip nama guru..." autocomplete="off">
+              <button class="si-clear" id="btn-clear-search"><i class="fas fa-times-circle"></i></button>
+            </div>
+            <div class="dd-wrap" id="ddwrap"></div>
+          </div>
+        </div>
+      </div>
+      <div id="saya-banner" class="hidden"></div>
+      <div id="t-banner" class="t-banner hidden fade-in">
+        <div class="t-av"><i class="fas fa-user-tie"></i></div>
+        <div style="min-width:0;flex:1;"><div class="t-name" id="t-name">—</div><div class="t-sub" id="t-sub">Guru</div></div>
+        <button class="t-chg" id="btn-change-teacher"><i class="fas fa-exchange-alt"></i> Tukar</button>
+      </div>
+      <div id="saya-content"></div>
+    </div>
+
+    <!-- SUBPAGE: Kelas -->
+    <div id="sub-kelas" class="hidden fade-in">
+      <div id="kelas-banner" class="hidden"></div>
+      <div class="personal-table-wrap" id="kelas-picker-card">
+        <div class="pt-header"><div class="pt-header-icon"><i class="fas fa-door-open"></i></div>
+          <div><div class="pt-header-title">Pilih Kelas</div><div class="pt-header-sub">Lihat jadual penuh dan guru ganti bagi kelas</div></div></div>
+        <div class="kelas-select-wrap"><select id="kelas-select" class="kelas-select"><option value="">— Pilih Kelas —</option></select></div>
+      </div>
+      <div id="kelas-content"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="js/page-ruang-guru.js"></script>
+</body>
+</html>

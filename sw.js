@@ -1,7 +1,8 @@
 const CACHE_NAME = 'relief-v1';
 
 const STATIC_ASSETS = [
-  '/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png',
+  '/', '/index.html', '/ruang-guru.html', '/penyelaras.html', '/admin.html', '/migrate.html',
+  '/manifest.json', '/icon-192.png', '/icon-512.png',
   '/css/style.css', '/css/relief-extra.css'
 ];
 

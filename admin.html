@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Admin — Sistem Guru Ganti</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f2044">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/relief-extra.css">
+</head>
+<body>
+
+<div id="nav-root"></div>
+
+<div class="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" data-sub="xml" onclick="AdminPage.switchSub('xml')"><i class="fas fa-file-upload"></i> XML ASC</button>
+    <button class="tab-btn" data-sub="logo" onclick="AdminPage.switchSub('logo')"><i class="fas fa-image"></i> Upload Logo</button>
+    <button class="tab-btn" data-sub="pengguna" onclick="AdminPage.switchSub('pengguna')"><i class="fas fa-users-cog"></i> Pengurusan Pengguna</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="page-gate"></div>
+  <div id="page-content" class="hidden">
+
+    <!-- SUBPAGE: XML ASC -->
+    <div id="sub-xml" class="fade-in">
+      <div class="card">
+        <div class="card-head"><div class="card-head-icon"><i class="fas fa-file-upload"></i></div>
+          <div><div class="card-head-title">Muat Naik Jadual ASC</div><div class="card-head-sub">Fail .xml daripada aSc Timetables</div></div></div>
+        <div class="card-body">
+          <div class="file-drop" id="xml-drop-zone">
+            <input type="file" id="xmlFile" accept=".xml" style="display:none;">
+            <i class="fas fa-cloud-upload-alt" style="font-size:2rem;color:var(--teal);display:block;margin-bottom:12px;"></i>
+            <div style="font-weight:800;color:var(--navy);">Ketik untuk pilih fail XML</div>
+          </div>
+          <div id="setup-loading" class="hidden" style="margin-top:16px;text-align:center;"><div class="spinner"></div><div class="s-sub" id="setup-loading-msg">Memproses...</div></div>
+          <div id="setup-msg" style="margin-top:12px;font-size:var(--fs-sm);font-weight:700;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBPAGE: Upload Logo -->
+    <div id="sub-logo" class="hidden fade-in">
+      <div class="card">
+        <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);"><i class="fas fa-image"></i></div>
+          <div><div class="card-head-title">Logo Sekolah</div><div class="card-head-sub">Dipaparkan dalam output PDF</div></div></div>
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div id="logo-preview-wrap" style="width:80px;height:80px;border-radius:12px;border:2px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden;">
+              <span id="logo-preview-empty" style="color:#94a3b8;font-size:.7rem;text-align:center;padding:6px;">Tiada logo</span>
+              <img id="logo-preview-img" style="display:none;width:100%;height:100%;object-fit:contain;">
+            </div>
+            <div style="flex:1;min-width:160px;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <label class="btn btn-primary btn-sm" style="cursor:pointer;">
+                  <i class="fas fa-upload"></i> Pilih Gambar
+                  <input type="file" id="logoFileInput" accept="image/*" style="display:none;">
+                </label>
+                <button id="btn-save-logo" class="btn btn-success btn-sm hidden"><i class="fas fa-save"></i> Simpan</button>
+                <button id="btn-remove-logo" class="btn-ghost btn-sm" style="color:#e53e3e;border-color:#e53e3e;"><i class="fas fa-trash"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBPAGE: Pengurusan Pengguna -->
+    <div id="sub-pengguna" class="hidden fade-in">
+      <div class="card">
+        <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#059669,#047857);"><i class="fas fa-users-cog"></i></div>
+          <div><div class="card-head-title">Pengurusan Pengguna</div><div class="card-head-sub">Tetapkan role Admin untuk pengguna yang log masuk</div></div></div>
+        <div class="card-body"><div id="user-mgmt-list">Memuatkan...</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="confirmModal" class="confirm-overlay hidden">
+  <div class="confirm-box">
+    <div id="confirm-title" class="confirm-title">Sahkan</div>
+    <div id="confirm-msg" class="confirm-msg"></div>
+    <div class="confirm-actions">
+      <button id="confirm-cancel-btn" class="confirm-btn confirm-btn-cancel">Batal</button>
+      <button id="confirm-ok-btn" class="confirm-btn confirm-btn-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="js/page-admin.js"></script>
+</body>
+</html>
