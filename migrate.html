@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Migrasi Data — Sistem Guru Ganti</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{font-family:'Plus Jakarta Sans',sans-serif;background:#f0f4fa;color:#1e2d4a;margin:0;padding:20px;max-width:720px;margin:0 auto;}
+  h1{font-size:1.3rem;color:#0f2044;}
+  p.sub{color:#6b7c9e;font-size:.85rem;margin-top:-8px;}
+  .card{background:#fff;border:1.5px solid #dde4f0;border-radius:14px;padding:18px;margin-bottom:16px;}
+  .card h3{margin:0 0 4px;font-size:.95rem;color:#0f2044;}
+  .card p{margin:0 0 10px;font-size:.78rem;color:#6b7c9e;}
+  input[type=file]{width:100%;margin-bottom:10px;}
+  button{background:#0f2044;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;font-family:inherit;}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  .log{background:#0f2044;color:#a5f3fc;font-family:'JetBrains Mono',monospace;font-size:.72rem;padding:12px;border-radius:8px;max-height:200px;overflow-y:auto;white-space:pre-wrap;margin-top:10px;}
+  .warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px 14px;border-radius:10px;font-size:.8rem;margin-bottom:16px;}
+  #gate{text-align:center;padding:60px 20px;}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>Log masuk sebagai Admin untuk teruskan migrasi</h1>
+  <button id="btn-login">Log Masuk dengan Google</button>
+</div>
+
+<div id="tool" style="display:none;">
+  <h1>🔄 Migrasi Data ke Firestore</h1>
+  <p class="sub">Jalankan SEKALI sahaja. Eksport setiap sheet dari Google Sheets lama (File → Download → Comma Separated Values) dan muat naik di sini.</p>
+  <div class="warn">⚠️ Muat naik <strong>Teachers</strong> & <strong>MasterTimetable</strong> dahulu (padam data lama automatik), kemudian <strong>DailyBoard</strong> & <strong>ReliefAssignments</strong> jika perlu sejarah lama.</div>
+
+  <div class="card">
+    <h3>1. Teachers.csv</h3>
+    <p>Lajur: ID, Name, Short, Contact, Email</p>
+    <input type="file" id="f-teachers" accept=".csv">
+    <button onclick="importTeachers()">Import Teachers</button>
+  </div>
+
+  <div class="card">
+    <h3>2. MasterTimetable.csv</h3>
+    <p>Lajur: Day, Period, Start, End, ClassID, Class, SubID, Subject, TeachID, Teacher</p>
+    <input type="file" id="f-master" accept=".csv">
+    <button onclick="importMaster()">Import MasterTimetable</button>
+  </div>
+
+  <div class="card">
+    <h3>3. DailyBoard.csv <span style="font-weight:400;color:#94a3b8;">(pilihan)</span></h3>
+    <p>Lajur: Date, AbsentTeacherIds(JSON), Assignments(JSON), Status, UpdatedAt, AbsentReasons(JSON)</p>
+    <input type="file" id="f-board" accept=".csv">
+    <button onclick="importBoard()">Import DailyBoard</button>
+  </div>
+
+  <div class="card">
+    <h3>4. ReliefAssignments.csv <span style="font-weight:400;color:#94a3b8;">(pilihan — arkib)</span></h3>
+    <p>Lajur: Batch ID, Date, Day, Period, Time, Class, Subject, Absent Teacher, Relief Teacher, Timestamp, Note, Reason</p>
+    <input type="file" id="f-relief" accept=".csv">
+    <button onclick="importRelief()">Import ReliefAssignments</button>
+  </div>
+
+  <div id="log" class="log">Menunggu tindakan...</div>
+</div>
+
+<script type="module" src="js/migrate.js"></script>
+</body>
+</html>

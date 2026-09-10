@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ── Data awam (boleh baca semua) — hanya admin boleh tulis ──
+    match /teachers/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /masterTimetable/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /dailyBoard/{date} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /reliefRecords/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Pengguna ──
+    match /users/{uid} {
+      // Sesiapa yang log masuk boleh baca senarai pengguna (perlu utk semak role sendiri
+      // & panel Pengurusan Pengguna admin memaparkan senarai).
+      allow read: if isSignedIn();
+
+      // Pengguna cipta profil sendiri sekali sahaja (first login), TIDAK boleh
+      // tetapkan role sendiri jadi 'admin' — hanya 'pending' dibenarkan semasa create.
+      allow create: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.role in ['pending', 'admin']
+                    && (request.resource.data.role != 'admin' || isAdmin());
+
+      // Update field 'teacherId' — pengguna sendiri sahaja (pautan nama guru, ggview).
+      allow update: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teacherId']);
+
+      // Update field 'role' — admin sahaja.
+      allow update: if isAdmin();
+    }
+  }
+}
