@@ -1,4 +1,4 @@
-import { initNav, gatePage } from './nav.js';
+import { initNav, gatePage, initialSub } from './nav.js';
 import { authState, setMyTeacherId } from './auth.js';
 import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
@@ -16,7 +16,6 @@ function getDate() { return $('datePicker').value; }
 
 function switchSub(sub) {
   currentSub = sub;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
   $('sub-saya').classList.toggle('hidden', sub !== 'saya');
   $('sub-kelas').classList.toggle('hidden', sub !== 'kelas');
   if (sub === 'saya') renderSayaGate();
@@ -304,10 +303,11 @@ gatePage('login', async () => {
   $('tsearch').addEventListener('input', () => { renderDD($('tsearch').value); openDD(); });
   $('tsearch').addEventListener('focus', () => { renderDD($('tsearch').value); openDD(); });
 
-  switchSub('saya');
+  switchSub(initialSub('saya'));
+  window.addEventListener('hashchange', () => switchSub(initialSub('saya')));
 });
 
-window.RGPage = { switchSub, selectT };
+window.RGPage = { selectT };
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

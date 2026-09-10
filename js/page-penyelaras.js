@@ -1,4 +1,4 @@
-import { initNav, gatePage } from './nav.js';
+import { initNav, gatePage, initialSub } from './nav.js';
 import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { getReliefFromAssignment } from './board-engine.js';
@@ -17,7 +17,6 @@ function getDate() { return $('datePicker').value; }
 
 function switchSub(sub) {
   currentSub = sub;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
   ['papan', 'senarai', 'sejarah'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
   if (sub === 'papan') loadPapan();
   else if (sub === 'senarai') { renderSenaraiXml(); loadExtraTeachersAdmin(); }
@@ -449,10 +448,11 @@ gatePage('admin', async () => {
   $('override-toggle').addEventListener('change', toggleOverride);
   $('assign-search').addEventListener('input', renderAssignList);
 
-  switchSub('papan');
+  switchSub(initialSub('papan'));
+  window.addEventListener('hashchange', () => switchSub(initialSub('papan')));
 });
 
-window.PGGPage = { switchSub };
+window.PGGPage = {};
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

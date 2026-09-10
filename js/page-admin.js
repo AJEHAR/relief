@@ -1,4 +1,4 @@
-import { initNav, gatePage } from './nav.js';
+import { initNav, gatePage, initialSub } from './nav.js';
 import { authState } from './auth.js';
 import * as db from './db.js';
 import { processASCXML } from './xml-import.js';
@@ -9,7 +9,6 @@ initNav('admin');
 let pendingLogoBase64 = undefined;
 
 function switchSub(sub) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
   ['xml', 'logo', 'pengguna'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
   if (sub === 'logo') loadAdminLogoPreview();
   if (sub === 'pengguna') loadUserMgmt();
@@ -95,10 +94,11 @@ gatePage('admin', async () => {
   $('logoFileInput').addEventListener('change', previewLogo);
   $('btn-save-logo').addEventListener('click', saveLogoAction);
   $('btn-remove-logo').addEventListener('click', removeLogoAction);
-  switchSub('xml');
+  switchSub(initialSub('xml'));
+  window.addEventListener('hashchange', () => switchSub(initialSub('xml')));
 });
 
-window.AdminPage = { switchSub };
+window.AdminPage = {};
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

@@ -70,3 +70,35 @@
   .hamburger-btn{display:block;}
   .page-nav-desktop{display:none;}
 }
+
+/* Desktop dropdown */
+.page-link-wrap{position:relative;}
+.page-link-btn{background:none;border:none;cursor:pointer;font-family:inherit;}
+.dd-chevron{font-size:.6rem;margin-left:2px;transition:transform .15s;}
+.page-link-btn.open .dd-chevron,.page-dropdown.open ~ .page-link-btn .dd-chevron{transform:rotate(180deg);}
+.page-dropdown{position:absolute;top:calc(100% + 8px);left:0;background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);min-width:200px;padding:8px;display:none;z-index:250;}
+.page-dropdown.open{display:block;}
+.dd-item-link{display:block;padding:10px 12px;border-radius:8px;color:var(--navy);text-decoration:none;font-size:.82rem;font-weight:600;}
+.dd-item-link:hover{background:#eef4ff;}
+.dd-item-link.active{background:var(--teal);color:#fff;}
+
+/* Drawer accordion */
+.drawer-group-head{width:100%;background:none;border:none;font-family:inherit;text-align:left;cursor:pointer;}
+.acc-chevron{margin-left:auto;font-size:.65rem;transition:transform .2s;color:var(--muted);}
+.drawer-group-head.open .acc-chevron{transform:rotate(180deg);}
+.drawer-sublist{max-height:0;overflow:hidden;transition:max-height .2s ease;padding-left:30px;}
+.drawer-sublist.open{max-height:400px;}
+.drawer-sublink{display:block;padding:10px 12px;color:var(--muted);text-decoration:none;font-size:.82rem;font-weight:700;border-radius:8px;}
+.drawer-sublink:hover{background:#f3f6fb;}
+.drawer-sublink.active{background:#fbbf24;color:#78350f;}
+
+.drawer{display:flex;flex-direction:column;}
+.page-nav-drawer{flex:1;overflow-y:auto;}
+.drawer-footer{border-top:1.5px solid var(--border);padding:14px;flex-shrink:0;}
+.drawer-profile{display:flex;align-items:center;gap:10px;}
+.drawer-profile .user-photo{width:38px;height:38px;}
+.drawer-profile .u-meta{flex:1;min-width:0;}
+.drawer-profile .user-name{color:var(--navy);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.drawer-logout{background:none;border:none;color:var(--danger);font-size:.72rem;font-weight:700;cursor:pointer;padding:2px 0;}
+.drawer-login-wrap{padding:2px 0;}
+.drawer-copyright{margin-top:12px;font-size:.65rem;color:#94a3b8;text-align:center;}
