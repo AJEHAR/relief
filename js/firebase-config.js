@@ -23,5 +23,5 @@ export const firebaseConfig = {
 // Kosongkan array ni [] jika anda nak tetapkan admin terus dari
 // Firebase Console → Firestore → koleksi "users" secara manual.
 export const BOOTSTRAP_ADMIN_EMAILS = [
-  "sekolah-2167@moe-dl.edu.my",
+  "azharuddinhaniff@gmail.com",
 ];
