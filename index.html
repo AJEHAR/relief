@@ -132,7 +132,33 @@
           <div id="absent-tags-container" class="absent-tags"></div>
         </div>
       </div>
-      <div id="assign-list-wrap"></div>
+      <!-- Jadual Visual Induk (grid penuh — sama seperti sistem asal) -->
+      <div class="timetable-wrap" id="timetable-wrap">
+        <div class="timetable-toolbar">
+          <div class="timetable-title"><i class="fas fa-th" style="color:var(--teal);"></i> Jadual Induk Harian</div>
+          <div class="timetable-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>Biasa</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--danger);"></div>Tak Hadir</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--success);"></div>Dah Isi</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ea580c;"></div>Sedang Relief</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#2563eb;outline:2px solid #ea580c;outline-offset:1px;"></div>Override</div>
+          </div>
+        </div>
+        <div class="timetable-scroll">
+          <div id="timetable-container">
+            <div class="state-box" style="border-radius:0;border:none;">
+              <div class="state-icon"><i class="fas fa-table"></i></div>
+              <div class="state-title">Jadual Kosong</div>
+              <div class="state-sub">Tandakan guru tidak hadir untuk lihat jadual</div>
+            </div>
+          </div>
+        </div>
+        <div class="absent-stat" id="slot-stat-bar" style="display:none;">
+          <div class="absent-stat-item"><div class="legend-dot" style="background:var(--danger);border-radius:50%;width:10px;height:10px;"></div><span id="stat-pending">0 slot belum isi</span></div>
+          <div class="absent-stat-item"><div class="legend-dot" style="background:var(--success);border-radius:50%;width:10px;height:10px;"></div><span id="stat-done">0 slot dah isi</span></div>
+          <div class="absent-stat-item"><div class="legend-dot" style="background:#3b82f6;border-radius:50%;width:10px;height:10px;"></div><span id="stat-normal">0 slot biasa</span></div>
+        </div>
+      </div>
       <div class="card" id="confirm-card">
         <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;align-items:center;">
           <div id="board-status-chip"></div>

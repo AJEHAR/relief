@@ -510,7 +510,7 @@ async function loadPapan() {
     currentBoard = await db.getDailyBoard(getDate());
     populateAbsentSelect();
     renderAbsentPanel();
-    renderAssignCards();
+    renderTimetableGrid();
     renderBoardStatus();
     $('papan-loading').classList.add('hidden');
     $('papan-content').classList.remove('hidden');
@@ -557,7 +557,7 @@ async function addAbsent() {
   currentBoard = res;
   populateAbsentSelect();
   renderAbsentPanel();
-  renderAssignCards();
+  renderTimetableGrid();
   $('absent-reason-select').value = '';
   toast('Guru ditanda tidak hadir.', 'success');
 }
@@ -571,43 +571,144 @@ function removeAbsent(teacherId) {
       const res = await db.removeAbsentTeacher({ date: getDate(), teacherId });
       if (!res.success) return toast(res.message, 'error');
       currentBoard = res;
-      populateAbsentSelect(); renderAbsentPanel(); renderAssignCards();
+      populateAbsentSelect(); renderAbsentPanel(); renderTimetableGrid();
       toast('Ditanggalkan.', 'success');
     }
   });
 }
 
-function renderAssignCards() {
-  const wrap = $('assign-list-wrap');
-  const ids = currentBoard.absentIds || [];
-  if (!ids.length) { wrap.innerHTML = ''; return; }
+function renderTimetableGrid() {
+  const container = $('timetable-container');
+  const statBar = $('slot-stat-bar');
+  const board = currentBoard;
+  const periods = board.periods || [];
+  const classes = board.classes || [];
 
-  let html = '';
-  ids.forEach(tid => {
-    const t = teachersList.find(x => x.id === tid) || { name: tid };
-    const slotsByPeriod = currentBoard.teacherMap?.[tid] || {};
-    const periodIds = Object.keys(slotsByPeriod).filter(k => k !== 'name' && k !== 'id');
-    if (!periodIds.length) return;
-    html += `<div class="card admin-section"><div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#dc2626,#b91c1c);"><i class="fas fa-user-slash"></i></div>
-      <div><div class="card-head-title">${esc(t.name)}</div><div class="card-head-sub">${periodIds.length} slot perlu guru ganti</div></div></div><div class="card-body">`;
-    periodIds.sort((a, b) => { const ai = parseInt(a, 10), bi = parseInt(b, 10); return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : a.localeCompare(b); })
-      .forEach(pid => {
-        (slotsByPeriod[pid] || []).forEach(slot => {
-          const period = (currentBoard.periods || []).find(p => p.id === pid) || {};
-          html += `<div class="assign-period-card">
-            <div class="assign-period-head">
-              <div><strong>Wkt ${esc(pid)}</strong> · ${esc(period.start || '')}–${esc(period.end || '')} · <span class="c-pill">${esc(slot.className)}</span> · ${esc(slot.subject) || '—'}</div>
-            </div>
-            ${slot.reliefTeacher
-              ? `<div class="assign-period-relief"><span><i class="fas fa-check-circle"></i> ${esc(slot.reliefTeacher)}${slot.note ? ' · 📝 ' + esc(slot.note) : ''}</span>
-                  <button class="btn-ghost btn-sm" onclick="ReliefApp.openAssignModal('${escJs(slot.assignKey)}')"><i class="fas fa-edit"></i></button></div>`
-              : `<div class="assign-period-empty" onclick="ReliefApp.openAssignModal('${escJs(slot.assignKey)}')"><i class="fas fa-plus"></i> Tetapkan Guru Ganti</div>`}
-          </div>`;
-        });
+  if (!periods.length || !classes.length) {
+    container.innerHTML = `<div class="state-box" style="border-radius:0;border:none;">
+      <div class="state-icon"><i class="fas fa-table"></i></div>
+      <div class="state-title">Jadual Tiada Data</div>
+      <div class="state-sub">Tiada data jadual untuk hari ini. Sila muat naik jadual XML dahulu.</div>
+    </div>`;
+    statBar.style.display = 'none';
+    return;
+  }
+
+  // Kumpul semua guru dari teacherMap (sokong multi-guru satu slot)
+  const guruMap = {};
+  if (board.teacherMap) {
+    Object.entries(board.teacherMap).forEach(([tid, data]) => {
+      const slots = {};
+      periods.forEach(p => {
+        if (p.id === 'REHAT') return;
+        const slotArr = data[p.id];
+        if (slotArr && slotArr.length) slots[p.id] = slotArr;
       });
-    html += `</div></div>`;
+      if (Object.keys(slots).length > 0) guruMap[tid] = { name: data.name, id: tid, slots };
+    });
+  }
+
+  const absentSet = new Set(board.absentIds || []);
+  const guruList = Object.values(guruMap).sort((a, b) => {
+    const aA = absentSet.has(a.id), bA = absentSet.has(b.id);
+    if (aA && !bA) return -1;
+    if (!aA && bA) return 1;
+    return a.name.localeCompare(b.name);
   });
-  wrap.innerHTML = html || `<div class="card"><div class="state-box"><div class="s-sub">Tiada slot memerlukan guru ganti.</div></div></div>`;
+
+  let statPending = 0, statDone = 0, statNormal = 0;
+  guruList.forEach(g => {
+    periods.forEach(p => {
+      if (p.id === 'REHAT') return;
+      (g.slots[p.id] || []).forEach(cell => {
+        if (!absentSet.has(g.id)) { statNormal++; return; }
+        if (!cell.reliefTeacher) statPending++; else statDone++;
+      });
+    });
+  });
+  $('stat-pending').textContent = statPending + ' slot belum isi';
+  $('stat-done').textContent = statDone + ' slot dah isi';
+  $('stat-normal').textContent = statNormal + ' slot biasa';
+  statBar.style.display = 'flex';
+
+  const reliefDutyMap = {};
+  Object.entries(board.assignments || {}).forEach(([key, val]) => {
+    const reliefName = getReliefFromAssignment(val).relief;
+    if (!reliefName) return;
+    const periodId = key.split('|')[1];
+    if (!reliefDutyMap[reliefName]) reliefDutyMap[reliefName] = new Set();
+    reliefDutyMap[reliefName].add(periodId);
+  });
+
+  let html = '<table class="tt-table"><thead><tr class="tt-head-row">';
+  html += `<th class="tt-sticky tt-head-guru">GURU</th>`;
+  periods.forEach(p => {
+    if (p.id === 'REHAT') {
+      html += `<th class="tt-head-rehat">☕<div style="font-size:.5rem;margin-top:2px;">Rehat</div></th>`;
+    } else {
+      html += `<th class="tt-head-period"><div class="tt-head-period-num">Wkt ${esc(p.id)}</div><div class="tt-head-period-time">${esc(p.start)}</div><div class="tt-head-period-time">${esc(p.end)}</div></th>`;
+    }
+  });
+  html += '</tr></thead><tbody>';
+
+  guruList.forEach(g => {
+    const isAbsent = absentSet.has(g.id);
+    const reason = (board.absentReasons || {})[g.id] || '';
+    const nameParts = g.name.split(' ');
+    const shortName = nameParts.length > 3 ? nameParts.slice(0, 3).join(' ') + '…' : g.name;
+
+    html += `<tr><td class="tt-sticky tt-guru-cell ${isAbsent ? 'tt-guru-absent' : ''}">
+      <span class="tt-guru-name">${esc(shortName)}</span>
+      ${isAbsent ? `<span class="tt-guru-tag" title="${esc(reason)}">✗ ${esc(reason) || 'Tak Hadir'}</span>` : ''}
+    </td>`;
+
+    periods.forEach(p => {
+      if (p.id === 'REHAT') { html += `<td class="tt-slot s-rehat"><div class="tt-slot-inner"><div class="tt-rehat-inner"><div class="tt-rehat-text">Rehat</div></div></div></td>`; return; }
+
+      const cells = g.slots[p.id] || [];
+      const isOnReliefDuty = reliefDutyMap[g.name]?.has(String(p.id));
+
+      if (!cells.length) {
+        if (isOnReliefDuty) {
+          const dutyClass = Object.entries(board.assignments || {}).find(([k, v]) => getReliefFromAssignment(v).relief === g.name && k.split('|')[1] === String(p.id));
+          const dutyClassName = dutyClass ? dutyClass[0].split('|')[2] : '?';
+          html += `<td class="tt-slot s-relief-duty"><div class="tt-slot-inner"><div class="tt-slot-subj">📌 Relief</div><div class="tt-slot-duty-badge"><i class="fas fa-arrow-right" style="font-size:.4rem;"></i>${esc(dutyClassName)}</div></div></td>`;
+        } else {
+          html += `<td class="tt-slot s-empty"><div class="tt-slot-inner"></div></td>`;
+        }
+        return;
+      }
+
+      const cell = cells[0];
+
+      if (!isAbsent) {
+        const isOverride = reliefDutyMap[g.name]?.has(String(p.id));
+        if (isOverride) {
+          const dutyEntry = Object.entries(board.assignments || {}).find(([k, v]) => getReliefFromAssignment(v).relief === g.name && k.split('|')[1] === String(p.id));
+          const dutyClass = dutyEntry ? dutyEntry[0].split('|')[2] : '?';
+          html += `<td class="tt-slot s-override"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div><div class="tt-slot-override-badge">⚠️ +Relief ${esc(dutyClass)}</div></div></td>`;
+        } else {
+          html += `<td class="tt-slot s-normal"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div></div></td>`;
+        }
+        return;
+      }
+
+      let slotClass = cell.reliefTeacher ? 's-done' : 's-absent';
+      let reliefHtml = '';
+      if (cell.reliefTeacher) {
+        const rParts = cell.reliefTeacher.split(' ');
+        const rShort = rParts.length > 2 ? rParts[0] + ' ' + rParts[1] : cell.reliefTeacher;
+        const noteIcon = cell.note ? `<span class="tt-slot-note-icon">📝</span>` : '';
+        reliefHtml = `<div class="tt-slot-relief"><i class="fas fa-check" style="font-size:.45rem;"></i>${esc(rShort)}${noteIcon}</div>`;
+      } else {
+        reliefHtml = `<div class="tt-slot-add"><i class="fas fa-plus" style="font-size:.45rem;"></i>Isi</div>`;
+      }
+      html += `<td class="tt-slot ${slotClass}" onclick="ReliefApp.openAssignModal('${escJs(cell.assignKey)}')"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div>${reliefHtml}</div></td>`;
+    });
+    html += `</tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
 // ── Assign modal ──
@@ -672,7 +773,7 @@ async function selectTeacher(teacherName) {
   const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: teacherName, note });
   if (!res.success) return toast('Gagal simpan: ' + res.message, 'error');
   currentBoard = res;
-  renderAssignCards(); closeAssignModal(); renderBoardStatus();
+  renderTimetableGrid(); closeAssignModal(); renderBoardStatus();
   toast(`${teacherName} dipilih sebagai guru ganti.`, 'success');
 }
 async function clearAssignment() {
@@ -680,7 +781,7 @@ async function clearAssignment() {
   const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: '', note: '' });
   if (!res.success) return toast('Gagal: ' + res.message, 'error');
   currentBoard = res;
-  renderAssignCards(); closeAssignModal();
+  renderTimetableGrid(); closeAssignModal();
 }
 async function saveNoteOnly() {
   if (!currentAssignSlot) return;
@@ -689,7 +790,7 @@ async function saveNoteOnly() {
   const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: existing, note });
   if (!res.success) return toast('Gagal: ' + res.message, 'error');
   currentBoard = res;
-  renderAssignCards(); closeAssignModal();
+  renderTimetableGrid(); closeAssignModal();
   toast('Catatan disimpan.', 'success');
 }
 
