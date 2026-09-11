@@ -102,3 +102,20 @@
 .drawer-logout{background:none;border:none;color:var(--danger);font-size:.72rem;font-weight:700;cursor:pointer;padding:2px 0;}
 .drawer-login-wrap{padding:2px 0;}
 .drawer-copyright{margin-top:12px;font-size:.65rem;color:#94a3b8;text-align:center;}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE WIDTH — ikut saiz skrin sebenar (bukan kunci 900px)
+   ═══════════════════════════════════════════════════ */
+.main{width:100%;max-width:1400px;margin:0 auto;padding:16px 20px 70px;box-sizing:border-box;}
+.navbar-inner{max-width:1400px;}
+
+@media (max-width:640px){
+  .main{padding:14px 12px 70px;}
+  .navbar-inner{padding:0 12px;}
+}
+@media (min-width:641px) and (max-width:1023px){
+  .main{max-width:92%;}
+}
+@media (min-width:1024px){
+  .main{max-width:min(94%, 1400px);}
+}
