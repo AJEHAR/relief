@@ -293,26 +293,8 @@
     .check-item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;accent-color:var(--teal);cursor:pointer;}
     .check-label{font-size:var(--fs-sm);font-weight:600;color:var(--text);flex:1;line-height:1.4;}
 
-    /* ── CUSTOM CONFIRM MODAL ── */
-    .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;}
-    .confirm-box{background:white;border-radius:20px;width:100%;max-width:360px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:confirmPop .2s cubic-bezier(.34,1.56,.64,1) forwards;}
-    @keyframes confirmPop{from{opacity:0;transform:scale(.88);}to{opacity:1;transform:scale(1);}}
-    .confirm-icon-wrap{padding:28px 24px 16px;text-align:center;}
-    .confirm-icon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:1.4rem;}
-    .confirm-icon-danger{background:#fef2f2;color:#dc2626;}
-    .confirm-icon-warn{background:#fffbeb;color:#d97706;}
-    .confirm-icon-info{background:#eff6ff;color:#2563eb;}
-    .confirm-title{font-size:1rem;font-weight:900;color:var(--navy);margin-bottom:8px;}
-    .confirm-msg{font-size:.85rem;color:var(--muted);line-height:1.55;}
-    .confirm-foot{display:flex;border-top:1.5px solid var(--border);}
-    .confirm-btn{flex:1;height:52px;border:none;font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent;}
-    .confirm-btn:active{opacity:.8;}
-    .confirm-btn-cancel{background:white;color:var(--muted);border-right:1.5px solid var(--border);}
-    .confirm-btn-ok{background:white;color:var(--danger);}
-    .confirm-btn-ok.warn{color:var(--warn);}
-    .confirm-btn-ok.primary{color:var(--navy);}
-    .confirm-btn-cancel:active{background:#f0f4fa;}
-    .confirm-btn-ok:active{background:#fef2f2;}
+    /* ── CONFIRM MODAL: dipindah & disatukan sepenuhnya ke css/relief-extra.css
+       (buang definisi lama di sini elak konflik/pertindihan kelas) ── */
     .hidden{display:none!important;}
     .fade-in{animation:fadeSlide .3s ease forwards;}
     @keyframes fadeSlide{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}

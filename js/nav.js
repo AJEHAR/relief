@@ -11,7 +11,7 @@ export const PAGES = [
       { id: 'saya', label: 'Jadual Saya' }, { id: 'kelas', label: 'Kelas' }
   ]},
   { id: 'penyelaras', href: 'penyelaras.html', label: 'Penyelaras GG', icon: 'fa-clipboard-list', need: 'admin', subs: [
-      { id: 'senarai', label: 'Senarai Nama Guru' }, { id: 'sejarah', label: 'Sejarah' }
+      { id: 'senarai', label: 'Senarai Nama Guru' }, { id: 'sejarah', label: 'Sejarah' }, { id: 'masa', label: 'Masa Jadual' }
   ]},
   { id: 'admin', href: 'admin.html', label: 'Admin', icon: 'fa-cog', need: 'admin', subs: [
       { id: 'xml', label: 'XML ASC' }, { id: 'logo', label: 'Upload Logo' }, { id: 'pengguna', label: 'Pengurusan Pengguna' }, { id: 'reset', label: 'Reset Data' }
@@ -143,7 +143,10 @@ export function initNav() {
   $('hamburger-btn').addEventListener('click', openDrawer);
   $('drawer-close').addEventListener('click', closeDrawer);
   overlay.addEventListener('click', closeDrawer);
-  document.querySelectorAll('.drawer-link, .drawer-sublink').forEach(a => a.addEventListener('click', closeDrawer));
+  // Nota: '.drawer-group-head' (butang toggle accordion) SENGAJA dikecualikan —
+  // ia bukan pautan navigasi, cuma buka/tutup senarai subpage. Kalau tak dikecualikan,
+  // drawer terus tertutup sebelum sempat nampak accordion terbuka.
+  document.querySelectorAll('.drawer-link:not(.drawer-group-head), .drawer-sublink').forEach(a => a.addEventListener('click', closeDrawer));
 
   $('btn-login').addEventListener('click', loginWithGoogle);
   $('btn-logout').addEventListener('click', logout);

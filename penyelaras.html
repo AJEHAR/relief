@@ -118,6 +118,36 @@
       <div id="history-container"></div>
     </div>
 
+    <!-- SUBPAGE: Masa Jadual -->
+    <div id="sub-masa" class="hidden fade-in">
+      <div class="card">
+        <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#0891b2,#0e7490);"><i class="fas fa-mug-hot"></i></div>
+          <div><div class="card-head-title">Masa Jadual (Rehat & Slot Tersuai)</div><div class="card-head-sub">Sisip waktu rehat/slot bukan-mengajar ke dalam jadual — boleh beza ikut hari</div></div></div>
+        <div class="card-body">
+          <div id="slot-list" style="margin-bottom:16px;"></div>
+          <div style="background:#f8fafc;border-radius:12px;padding:14px;">
+            <div id="slot-form-title" style="font-weight:800;color:var(--navy);font-size:.85rem;margin-bottom:10px;">+ Tambah Slot Baru</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              <input type="text" id="slot-label" placeholder="Label (cth: Rehat, Perhimpunan)" class="input-field" style="flex:2;min-width:160px;">
+              <input type="time" id="slot-start" class="input-field" style="flex:1;min-width:110px;">
+              <input type="time" id="slot-end" class="input-field" style="flex:1;min-width:110px;">
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:.78rem;font-weight:700;color:var(--navy);">
+              <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" class="slot-day" value="Isnin" checked> Isnin</label>
+              <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" class="slot-day" value="Selasa" checked> Selasa</label>
+              <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" class="slot-day" value="Rabu" checked> Rabu</label>
+              <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" class="slot-day" value="Khamis" checked> Khamis</label>
+              <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" class="slot-day" value="Jumaat" checked> Jumaat</label>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary btn-sm" id="btn-save-slot"><i class="fas fa-plus"></i> Tambah Slot</button>
+              <button class="btn-ghost btn-sm hidden" id="btn-cancel-slot-edit">Batal</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -142,6 +172,7 @@
 
 <div id="confirmModal" class="confirm-overlay hidden">
   <div class="confirm-box">
+    <div id="confirm-icon" class="confirm-icon"><i class="fas fa-question"></i></div>
     <div id="confirm-title" class="confirm-title">Sahkan</div>
     <div id="confirm-msg" class="confirm-msg"></div>
     <div class="confirm-actions">

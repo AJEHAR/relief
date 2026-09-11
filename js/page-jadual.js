@@ -1,5 +1,7 @@
 import { initNav, gatePage } from './nav.js';
+import { onAuthChange, isLoggedIn } from './auth.js';
 import * as db from './db.js';
+import { openPrintWindow, writePrintWindow } from './pdf-export.js';
 import { $, esc, todayStr, loadingCard, setBanner, toast } from './ui-utils.js';
 
 initNav();
@@ -7,6 +9,24 @@ initNav();
 let guruBoard = null;
 
 function getDate() { return $('datePicker').value; }
+
+function printInduk() {
+  if (!guruBoard) return;
+  const win = openPrintWindow();
+  const rd = guruBoard.reliefDuties || {};
+  const all = [];
+  Object.entries(rd).forEach(([rn, ds]) => ds.forEach(d => all.push({ ...d, reliefName: rn })));
+  all.sort((a, b) => {
+    const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
+    return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
+  });
+  const rows = all.map(d => `<tr><td>${esc(d.period)}</td><td>${esc(d.time)}</td><td>${esc(d.className)}</td><td>${esc(d.subject) || '—'}</td>
+    <td class="green">${esc(d.reliefName)}</td><td>${esc(d.absentTeacher) || '—'}</td><td>${esc(d.note) || ''}</td></tr>`).join('');
+  const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(guruBoard.dayName || '')}</div>
+    <div class="pdf-sub">${esc(getDate())}${!guruBoard.published ? ' · (Draf, belum disahkan)' : ''}</div>
+    <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Tidak Hadir</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
+  writePrintWindow(win, html, `Jadual Guru Ganti ${getDate()}`);
+}
 
 async function loadInduk() {
   $('induk-content').innerHTML = loadingCard();
@@ -70,6 +90,8 @@ gatePage('public', async () => {
   $('datePicker').value = todayStr();
   $('datePicker').addEventListener('change', loadInduk);
   $('btn-refresh').addEventListener('click', loadInduk);
+  $('btn-gen-pdf-induk').addEventListener('click', printInduk);
+  onAuthChange((state) => { if (state.ready) $('btn-gen-pdf-induk').classList.toggle('hidden', !isLoggedIn()); });
   await loadInduk();
 });
 

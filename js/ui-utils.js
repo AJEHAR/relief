@@ -30,6 +30,12 @@ export function toast(msg, type = 'info') {
 export function showConfirm({ title, msg, okLabel = 'OK', okType = 'primary', onOk }) {
   $('confirm-title').textContent = title;
   $('confirm-msg').textContent = msg;
+  const iconEl = $('confirm-icon');
+  if (iconEl) {
+    iconEl.className = 'confirm-icon' + (okType === 'warn' ? ' warn' : okType === 'primary' ? ' primary' : '');
+    const iconClass = okType === 'warn' ? 'fa-trash-alt' : okType === 'primary' ? 'fa-check' : 'fa-question';
+    iconEl.innerHTML = `<i class="fas ${iconClass}"></i>`;
+  }
   const okBtn = $('confirm-ok-btn'), cancelBtn = $('confirm-cancel-btn');
   const newOk = okBtn.cloneNode(true), newCancel = cancelBtn.cloneNode(true);
   newOk.textContent = okLabel;

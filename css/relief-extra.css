@@ -18,7 +18,6 @@
 
 .modal-x{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:4px 6px;}
 .modal-box-sm{max-width:400px;}
-.confirm-actions{display:flex;border-top:1.5px solid var(--border);}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f2044;color:#fff;padding:12px 20px;border-radius:12px;font-size:.82rem;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:400;max-width:90vw;text-align:center;}
 .toast.error{background:#dc2626;}
@@ -27,6 +26,24 @@
 .status-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:.75rem;font-weight:800;}
 .status-chip.draft{background:#fffbeb;color:#d97706;border:1px solid #fde68a;}
 .status-chip.confirmed{background:#f0fdf4;color:#059669;border:1px solid #86efac;}
+
+/* Confirm modal — SATU-SATUNYA definisi (elak konflik dgn CSS lain) */
+.confirm-overlay{position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;}
+.confirm-box{position:relative;background:#ffffff;border-radius:20px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.35);animation:confirmPop .2s cubic-bezier(.34,1.56,.64,1) forwards;padding:26px 24px 22px;text-align:center;}
+@keyframes confirmPop{from{opacity:0;transform:scale(.88);}to{opacity:1;transform:scale(1);}}
+.confirm-icon{position:relative;z-index:2;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:1.3rem;background:#eef4ff;color:#0f2044;}
+.confirm-icon.warn{background:#fef2f2;color:#dc2626;}
+.confirm-icon.primary{background:#eef9ff;color:#0d9488;}
+.confirm-title{position:relative;z-index:2;font-size:1.05rem;font-weight:900;color:#0f2044;margin-bottom:8px;text-align:center;}
+.confirm-msg{position:relative;z-index:2;font-size:.85rem;color:#6b7c9e;line-height:1.55;text-align:center;margin-bottom:22px;}
+.confirm-actions{position:relative;z-index:2;display:flex;gap:10px;}
+.confirm-btn{flex:1;height:46px;border-radius:12px;border:none;font-size:.85rem;font-weight:800;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.confirm-btn-cancel{background:#f1f5f9;color:#0f2044;}
+.confirm-btn-cancel:active{background:#e2e8f0;}
+.confirm-btn-ok{background:#0f2044;color:#ffffff;}
+.confirm-btn-ok.warn{background:#dc2626;}
+.confirm-btn-ok.primary{background:#0d9488;}
+.confirm-btn-ok:active{opacity:.85;}
 
 .assign-period-card{background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;}
 .assign-period-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}

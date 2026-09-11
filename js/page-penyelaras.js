@@ -17,10 +17,11 @@ function getDate() { return $('datePicker').value; }
 
 function switchSub(sub) {
   currentSub = sub;
-  ['papan', 'senarai', 'sejarah'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
+  ['papan', 'senarai', 'sejarah', 'masa'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
   if (sub === 'papan') loadPapan();
   else if (sub === 'senarai') { renderSenaraiXml(); loadExtraTeachersAdmin(); }
   else if (sub === 'sejarah') loadHistory();
+  else if (sub === 'masa') loadSlotList();
 }
 
 async function onDateChange() {
@@ -126,7 +127,7 @@ function renderTimetableGrid() {
     Object.entries(board.teacherMap).forEach(([tid, data]) => {
       const slots = {};
       periods.forEach(p => {
-        if (p.id === 'REHAT') return;
+        if (p.isRehat) return;
         const slotArr = data[p.id];
         if (slotArr && slotArr.length) slots[p.id] = slotArr;
       });
@@ -145,7 +146,7 @@ function renderTimetableGrid() {
   let statPending = 0, statDone = 0, statNormal = 0;
   guruList.forEach(g => {
     periods.forEach(p => {
-      if (p.id === 'REHAT') return;
+      if (p.isRehat) return;
       (g.slots[p.id] || []).forEach(cell => {
         if (!absentSet.has(g.id)) { statNormal++; return; }
         if (!cell.reliefTeacher) statPending++; else statDone++;
@@ -169,7 +170,7 @@ function renderTimetableGrid() {
   let html = '<table class="tt-table"><thead><tr class="tt-head-row">';
   html += `<th class="tt-sticky tt-head-guru">GURU</th>`;
   periods.forEach(p => {
-    if (p.id === 'REHAT') html += `<th class="tt-head-rehat">☕<div style="font-size:.5rem;margin-top:2px;">Rehat</div></th>`;
+    if (p.isRehat) html += `<th class="tt-head-rehat">☕<div style="font-size:.5rem;margin-top:2px;">${esc(p.label || 'Rehat')}</div></th>`;
     else html += `<th class="tt-head-period"><div class="tt-head-period-num">Wkt ${esc(p.id)}</div><div class="tt-head-period-time">${esc(p.start)}</div><div class="tt-head-period-time">${esc(p.end)}</div></th>`;
   });
   html += '</tr></thead><tbody>';
@@ -186,7 +187,7 @@ function renderTimetableGrid() {
     </td>`;
 
     periods.forEach(p => {
-      if (p.id === 'REHAT') { html += `<td class="tt-slot s-rehat"><div class="tt-slot-inner"><div class="tt-rehat-inner"><div class="tt-rehat-text">Rehat</div></div></div></td>`; return; }
+      if (p.isRehat) { html += `<td class="tt-slot s-rehat"><div class="tt-slot-inner"><div class="tt-rehat-inner"><div class="tt-rehat-text">${esc(p.label || 'Rehat')}</div></div></div></td>`; return; }
       const cells = g.slots[p.id] || [];
       const isOnReliefDuty = reliefDutyMap[g.name]?.has(String(p.id));
 
@@ -336,6 +337,7 @@ function confirmBoard() {
 async function generatePdf() {
   if (!currentBoard) return;
   const win = openPrintWindow();
+  const wasConfirmed = currentBoard.status === 'confirmed';
   const ids = currentBoard.absentIds || [];
   let rows = '';
   ids.forEach(tid => {
@@ -353,6 +355,16 @@ async function generatePdf() {
     <div class="pdf-sub">${esc(getDate())}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
   writePrintWindow(win, html, `Jadual Guru Ganti ${getDate()}`);
+
+  // Jana PDF turut auto-sahkan tapak (elak pentadbir lupa tekan "Sahkan Tapak")
+  if (!wasConfirmed) {
+    const res = await db.confirmDailyBoard({ date: getDate() });
+    if (res.success) {
+      toast('PDF dijana & tapak turut disahkan automatik.', 'success');
+      currentBoard = await db.getDailyBoard(getDate());
+      renderBoardStatus();
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -432,6 +444,116 @@ async function printArchive() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// MASA JADUAL (Rehat & Slot Tersuai)
+// ═══════════════════════════════════════════════════════════
+const ALL_DAYS = ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat'];
+let slotList = [];
+let editingSlotId = null;
+
+function htmlTimeToDisplay(t) {
+  if (!t) return '';
+  const [hStr, mStr] = t.split(':');
+  let h = parseInt(hStr, 10);
+  const ap = h >= 12 ? 'pm' : 'am';
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return `${h12}.${mStr}${ap}`;
+}
+function displayTimeToHtml(display) {
+  const m = String(display || '').trim().toLowerCase().match(/^(\d{1,2})[.:](\d{2})(am|pm)$/);
+  if (!m) return '';
+  let h = parseInt(m[1], 10); const min = m[2]; const ap = m[3];
+  if (ap === 'pm' && h !== 12) h += 12;
+  if (ap === 'am' && h === 12) h = 0;
+  return String(h).padStart(2, '0') + ':' + min;
+}
+
+async function loadSlotList() {
+  slotList = await db.getCustomSlots();
+  renderSlotList();
+}
+
+function renderSlotList() {
+  const wrap = $('slot-list');
+  if (!slotList.length) { wrap.innerHTML = `<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Tiada slot tersuai. Tambah satu di bawah.</div>`; return; }
+  wrap.innerHTML = slotList.map(s => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+      <div style="flex:1;min-width:160px;">
+        <div style="font-weight:800;color:var(--navy);font-size:.85rem;">☕ ${esc(s.label)}</div>
+        <div style="font-size:.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">${esc(s.start)} – ${esc(s.end)}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;max-width:280px;">
+        ${ALL_DAYS.map(d => `<span style="font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${(s.days || []).includes(d) ? '#e0f2fe' : '#f1f5f9'};color:${(s.days || []).includes(d) ? '#0369a1' : '#cbd5e1'};">${d.slice(0, 3)}</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-ghost btn-sm slot-edit-btn" data-id="${esc(s.id)}" title="Edit"><i class="fas fa-edit"></i></button>
+        <button class="btn-ghost btn-sm slot-del-btn" data-id="${esc(s.id)}" style="color:#dc2626;" title="Padam"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>`).join('');
+  wrap.querySelectorAll('.slot-edit-btn').forEach(b => b.addEventListener('click', () => startEditSlot(b.dataset.id)));
+  wrap.querySelectorAll('.slot-del-btn').forEach(b => b.addEventListener('click', () => deleteSlot(b.dataset.id)));
+}
+
+function startEditSlot(id) {
+  const s = slotList.find(x => x.id === id);
+  if (!s) return;
+  editingSlotId = id;
+  $('slot-label').value = s.label;
+  $('slot-start').value = displayTimeToHtml(s.start);
+  $('slot-end').value = displayTimeToHtml(s.end);
+  document.querySelectorAll('.slot-day').forEach(cb => { cb.checked = (s.days || []).includes(cb.value); });
+  $('slot-form-title').textContent = `Edit Slot — ${s.label}`;
+  $('btn-save-slot').innerHTML = '<i class="fas fa-save"></i> Simpan Perubahan';
+  $('btn-cancel-slot-edit').classList.remove('hidden');
+  $('slot-label').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function resetSlotForm() {
+  editingSlotId = null;
+  $('slot-label').value = '';
+  $('slot-start').value = '';
+  $('slot-end').value = '';
+  document.querySelectorAll('.slot-day').forEach(cb => { cb.checked = true; });
+  $('slot-form-title').textContent = '+ Tambah Slot Baru';
+  $('btn-save-slot').innerHTML = '<i class="fas fa-plus"></i> Tambah Slot';
+  $('btn-cancel-slot-edit').classList.add('hidden');
+}
+
+async function saveSlot() {
+  const label = $('slot-label').value.trim();
+  const startHtml = $('slot-start').value, endHtml = $('slot-end').value;
+  const days = Array.from(document.querySelectorAll('.slot-day:checked')).map(cb => cb.value);
+  if (!label) return toast('Sila isi label slot.', 'error');
+  if (!startHtml || !endHtml) return toast('Sila isi masa mula & tamat.', 'error');
+  if (!days.length) return toast('Sila pilih sekurang-kurangnya 1 hari.', 'error');
+
+  const start = htmlTimeToDisplay(startHtml), end = htmlTimeToDisplay(endHtml);
+  if (editingSlotId) {
+    const idx = slotList.findIndex(s => s.id === editingSlotId);
+    if (idx > -1) slotList[idx] = { ...slotList[idx], label, start, end, days };
+  } else {
+    slotList.push({ id: 'SLOT_' + Date.now(), label, start, end, days });
+  }
+  await db.saveCustomSlots(slotList);
+  toast(editingSlotId ? 'Slot dikemaskini.' : 'Slot ditambah.', 'success');
+  resetSlotForm();
+  renderSlotList();
+}
+
+function deleteSlot(id) {
+  const s = slotList.find(x => x.id === id);
+  showConfirm({
+    title: 'Padam Slot', msg: `Padam slot "${s ? s.label : id}"? Ia akan hilang dari jadual serta-merta.`,
+    okLabel: 'Padam', okType: 'warn',
+    onOk: async () => {
+      slotList = slotList.filter(x => x.id !== id);
+      await db.saveCustomSlots(slotList);
+      toast('Slot dipadam.', 'success');
+      renderSlotList();
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
 gatePage('admin', async () => {
   const lists = await loadStaticLists();
   teachersList = lists.teachersList;
@@ -449,6 +571,8 @@ gatePage('admin', async () => {
   $('btn-save-note').addEventListener('click', saveNoteOnly);
   $('override-toggle').addEventListener('change', toggleOverride);
   $('assign-search').addEventListener('input', renderAssignList);
+  $('btn-save-slot').addEventListener('click', saveSlot);
+  $('btn-cancel-slot-edit').addEventListener('click', resetSlotForm);
 
   switchSub(initialSub('papan'));
   window.addEventListener('hashchange', () => switchSub(initialSub('papan')));

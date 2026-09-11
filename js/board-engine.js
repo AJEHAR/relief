@@ -38,10 +38,7 @@ export function getReliefFromAssignment(val) {
   return { relief: String(val.relief || ''), note: String(val.note || '') };
 }
 
-const REHAT_START = '10.10am';
-const REHAT_END = '10.30am';
-
-function buildPeriods(masterRows) {
+function buildPeriods(masterRows, customSlots, dayName) {
   const periodMap = {};
   masterRows.forEach(row => {
     const pid = String(row.period || '').trim();
@@ -56,15 +53,20 @@ function buildPeriods(masterRows) {
     return String(a.id).localeCompare(String(b.id));
   });
 
-  const rehatEndMins = timeToMins(REHAT_END);
-  const rehatStartMins = timeToMins(REHAT_START);
-  let insertIdx = periods.length;
-  for (let i = 0; i < periods.length; i++) {
-    if (timeToMins(periods[i].start) >= rehatEndMins) { insertIdx = i; break; }
-  }
-  if (insertIdx < periods.length || periods.some(p => timeToMins(p.end) <= rehatStartMins)) {
-    periods.splice(insertIdx, 0, { id: 'REHAT', start: REHAT_START, end: REHAT_END, isRehat: true });
-  }
+  // Slot tersuai (Rehat, dll) — ditapis ikut hari, disisip ikut kedudukan masa
+  const applicable = (customSlots || [])
+    .filter(s => !s.days || !s.days.length || s.days.includes(dayName))
+    .sort((a, b) => timeToMins(a.start) - timeToMins(b.start));
+
+  applicable.forEach(slot => {
+    const slotEndMins = timeToMins(slot.end);
+    let insertIdx = periods.length;
+    for (let i = 0; i < periods.length; i++) {
+      if (timeToMins(periods[i].start) >= slotEndMins) { insertIdx = i; break; }
+    }
+    periods.splice(insertIdx, 0, { id: slot.id, start: slot.start, end: slot.end, isRehat: true, label: slot.label || 'Rehat' });
+  });
+
   return periods;
 }
 
@@ -73,13 +75,14 @@ function buildPeriods(masterRows) {
  * masterRows: SEMUA baris masterTimetable (semua hari)
  * teachersList: SEMUA guru (teachers collection)
  */
-export function buildBoardData(masterRows, teachersList, dateStr, absentIds, assignments, absentReasons) {
+export function buildBoardData(masterRows, teachersList, dateStr, absentIds, assignments, absentReasons, customSlots) {
   absentReasons = absentReasons || {};
   const dayName = getMalayDayName(new Date(dateStr + 'T00:00:00'));
   const absentSet = new Set((absentIds || []).map(id => String(id).trim()));
 
   const todaySlots = masterRows.filter(row => String(row.day || '').toLowerCase() === dayName.toLowerCase());
-  const periods = buildPeriods(masterRows);
+  const periods = buildPeriods(masterRows, customSlots, dayName);
+  const rehatIds = new Set(periods.filter(p => p.isRehat).map(p => p.id));
 
   const classSet = new Set(todaySlots.map(row => String(row.className)));
   const classes = [...classSet].sort();
@@ -113,7 +116,7 @@ export function buildBoardData(masterRows, teachersList, dateStr, absentIds, ass
     const { relief: reliefName } = getReliefFromAssignment(val);
     if (!reliefName) return;
     const periodId = key.split('|')[1];
-    if (periodId === 'REHAT') return;
+    if (rehatIds.has(periodId)) return;
     const t = teachersList.find(x => x.name === reliefName);
     if (t) {
       if (!teacherReliefMap[t.id]) teacherReliefMap[t.id] = new Set();
@@ -178,13 +181,13 @@ export function buildBoardData(masterRows, teachersList, dateStr, absentIds, ass
  * Tambahan: reliefDuties + teacherSchedule (jadual PENUH setiap guru —
  * bahagian yang dikunci di belakang login).
  */
-export function buildBoardDataLight(masterRows, dateStr, absentIds, assignments, absentReasons) {
+export function buildBoardDataLight(masterRows, dateStr, absentIds, assignments, absentReasons, customSlots) {
   absentReasons = absentReasons || {};
   const dayName = getMalayDayName(new Date(dateStr + 'T00:00:00'));
   const absentSet = new Set((absentIds || []).map(id => String(id).trim()));
 
   const todaySlots = masterRows.filter(row => String(row.day || '').toLowerCase() === dayName.toLowerCase());
-  const periods = buildPeriods(masterRows);
+  const periods = buildPeriods(masterRows, customSlots, dayName);
 
   const classSet = new Set(todaySlots.map(row => String(row.className)));
   const classes = [...classSet].sort();

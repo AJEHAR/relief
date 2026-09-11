@@ -2,6 +2,7 @@ import { initNav, gatePage, initialSub } from './nav.js';
 import { authState, setMyTeacherId } from './auth.js';
 import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
+import { openPrintWindow, writePrintWindow } from './pdf-export.js';
 import { $, esc, escJs, escRx, todayStr, loadingCard, setBanner, toast } from './ui-utils.js';
 
 initNav();
@@ -61,12 +62,13 @@ async function renderSayaGate() {
 function renderSaya() {
   const bn = $('saya-banner'), ct = $('saya-content');
   const board = guruBoard;
-  if (!board || !board.success) { ct.innerHTML = ''; bn.className = 'hidden'; return; }
+  if (!board || !board.success) { ct.innerHTML = ''; bn.className = 'hidden'; $('btn-print-saya').classList.add('hidden'); return; }
   if (!board.published) setBanner(bn, 'pending', 'fa-clock', 'Jadual guru ganti belum disahkan oleh pentadbir. Data di bawah mungkin berubah.');
   else setBanner(bn, 'confirmed', 'fa-check-circle', 'Jadual telah disahkan. Data adalah muktamad.');
   bn.classList.remove('hidden');
-  if (!selT) { ct.innerHTML = ''; return; }
+  if (!selT) { ct.innerHTML = ''; $('btn-print-saya').classList.add('hidden'); return; }
   renderPersonalTimetable(ct, board);
+  $('btn-print-saya').classList.remove('hidden');
 }
 
 function renderPersonalTimetable(ct, board) {
@@ -81,7 +83,7 @@ function renderPersonalTimetable(ct, board) {
   let cTeach = 0, cRelief = 0, cOverride = 0, cFree = 0, rows = '';
   periods.forEach(p => {
     if (p.isRehat) {
-      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">☕<br>Rehat</span></div>
+      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">☕<br>${esc(p.label || "Rehat")}</span></div>
         <div class="pt-content-col" style="justify-content:center;"><span class="slot-chip chip-rehat"><i class="fas fa-coffee" style="font-size:.6rem;"></i> ${esc(p.start)} — ${esc(p.end)}</span></div></div>`;
       return;
     }
@@ -140,6 +142,36 @@ function renderPersonalTimetable(ct, board) {
       ${cOverride > 0 ? `<div class="pt-sum-item"><div class="pt-sum-num" style="color:#ea580c;">${cOverride}</div><div class="pt-sum-lbl">Override</div></div>` : ''}
       <div class="pt-sum-item"><div class="pt-sum-num" style="color:#94a3b8;">${cFree}</div><div class="pt-sum-lbl">Lapang</div></div>
     </div></div>`;
+}
+
+function printSaya() {
+  if (!selT || !guruBoard) return;
+  const win = openPrintWindow();
+  const board = guruBoard;
+  const periods = board.periods || [];
+  const reliefDuties = board.reliefDuties || {};
+  const myRelief = reliefDuties[selT.name] || [];
+  const mySlots = (board.teacherMap && board.teacherMap[selT.id]) || {};
+  const reliefByPeriod = {};
+  myRelief.forEach(d => { reliefByPeriod[String(d.period)] = d; });
+
+  let rows = '';
+  periods.forEach(p => {
+    if (p.isRehat) { rows += `<tr><td>${esc(p.label || 'Rehat')}</td><td>${esc(p.start)}–${esc(p.end)}</td><td colspan="2">—</td></tr>`; return; }
+    const pid = String(p.id);
+    const normals = mySlots[pid] || [];
+    const relief = reliefByPeriod[pid];
+    let statusTxt, classTxt;
+    if (normals.length && relief) { statusTxt = 'Mengajar + Ganti'; classTxt = `${normals.map(n => n.className).join(', ')} / Ganti: ${relief.className}`; }
+    else if (normals.length) { statusTxt = 'Mengajar'; classTxt = normals.map(n => `${n.className} (${n.subject || '—'})`).join(', '); }
+    else if (relief) { statusTxt = 'Guru Ganti'; classTxt = `${relief.className} (${relief.subject || '—'}) — ganti ${relief.absentTeacher || '?'}`; }
+    else { statusTxt = 'Lapang'; classTxt = '—'; }
+    rows += `<tr><td>${esc(pid)}</td><td>${esc(p.start)}–${esc(p.end)}</td><td>${esc(statusTxt)}</td><td>${esc(classTxt)}</td></tr>`;
+  });
+  const html = `<div class="pdf-title">Jadual Hari Ini — ${esc(selT.name)}</div>
+    <div class="pdf-sub">${esc(board.dayName || '')} · ${esc(getDate())}${!board.published ? ' · (Draf, belum disahkan)' : ''}</div>
+    <table><thead><tr><th>Waktu</th><th>Masa</th><th>Status</th><th>Butiran</th></tr></thead><tbody>${rows}</tbody></table>`;
+  writePrintWindow(win, html, `Jadual Saya - ${selT.name} - ${getDate()}`);
 }
 
 function changeTeacher() {
@@ -202,12 +234,13 @@ function onKelasChange() { selKelas = $('kelas-select').value || null; if (guruB
 function renderKelas() {
   const bn = $('kelas-banner'), ct = $('kelas-content');
   const board = guruBoard;
-  if (!board || !board.success) { ct.innerHTML = ''; bn.className = 'hidden'; return; }
+  if (!board || !board.success) { ct.innerHTML = ''; bn.className = 'hidden'; $('btn-print-kelas').classList.add('hidden'); return; }
   if (!board.published) setBanner(bn, 'pending', 'fa-clock', 'Jadual guru ganti belum disahkan oleh pentadbir. Data di bawah mungkin berubah.');
   else setBanner(bn, 'confirmed', 'fa-check-circle', 'Jadual telah disahkan. Data adalah muktamad.');
   bn.classList.remove('hidden');
-  if (!selKelas) { ct.innerHTML = `<div class="card"><div class="state-box"><div class="s-icon">🏫</div><div class="s-title">Pilih Kelas</div><div class="s-sub">Sila pilih nama kelas dari senarai di atas.</div></div></div>`; return; }
+  if (!selKelas) { ct.innerHTML = `<div class="card"><div class="state-box"><div class="s-icon">🏫</div><div class="s-title">Pilih Kelas</div><div class="s-sub">Sila pilih nama kelas dari senarai di atas.</div></div></div>`; $('btn-print-kelas').classList.add('hidden'); return; }
   renderClassTimetable(ct, board);
+  $('btn-print-kelas').classList.remove('hidden');
 }
 
 function renderClassTimetable(ct, board) {
@@ -235,7 +268,7 @@ function renderClassTimetable(ct, board) {
   let cNormal = 0, cGanti = 0, cFree = 0, rows = '';
   periods.forEach(p => {
     if (p.isRehat) {
-      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">☕<br>Rehat</span></div>
+      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">☕<br>${esc(p.label || "Rehat")}</span></div>
         <div class="pt-content-col" style="justify-content:center;"><span class="slot-chip chip-rehat"><i class="fas fa-coffee" style="font-size:.6rem;"></i> ${esc(p.start)} — ${esc(p.end)}</span></div></div>`;
       return;
     }
@@ -289,6 +322,49 @@ function renderClassTimetable(ct, board) {
       </div></div>`;
 }
 
+function printKelas() {
+  if (!selKelas || !guruBoard) return;
+  const win = openPrintWindow();
+  const board = guruBoard;
+  const periods = board.periods || [];
+  const rd = board.reliefDuties || {};
+  const classSchedule = {};
+  if (board.teacherMap) {
+    Object.entries(board.teacherMap).forEach(([tid, data]) => {
+      Object.keys(data).forEach(pid => {
+        if (pid === 'name' || pid === 'id') return;
+        (data[pid] || []).forEach(slot => {
+          if (slot.className === selKelas) {
+            if (!classSchedule[pid]) classSchedule[pid] = [];
+            classSchedule[pid].push({ teacherName: data.name, subject: slot.subject || '' });
+          }
+        });
+      });
+    });
+  }
+  const classRelief = {};
+  Object.entries(rd).forEach(([rn, duties]) => {
+    duties.forEach(d => { if (d.className === selKelas) classRelief[String(d.period)] = { reliefName: rn, absentTeacher: d.absentTeacher || '', subject: d.subject || '' }; });
+  });
+
+  let rows = '';
+  periods.forEach(p => {
+    if (p.isRehat) { rows += `<tr><td>${esc(p.label || 'Rehat')}</td><td>${esc(p.start)}–${esc(p.end)}</td><td colspan="2">—</td></tr>`; return; }
+    const pid = String(p.id);
+    const scheds = classSchedule[pid] || [];
+    const relief = classRelief[pid];
+    let statusTxt, detailTxt;
+    if (scheds.length && relief) { statusTxt = 'Guru Ganti'; detailTxt = `${relief.subject || scheds[0].subject} — ${relief.reliefName} (ganti ${scheds.map(s => s.teacherName).join(', ')})`; }
+    else if (scheds.length) { statusTxt = 'Kelas Biasa'; detailTxt = scheds.map(s => `${s.subject || '—'} (${s.teacherName})`).join(', '); }
+    else { statusTxt = 'Tiada Kelas'; detailTxt = '—'; }
+    rows += `<tr><td>${esc(pid)}</td><td>${esc(p.start)}–${esc(p.end)}</td><td>${esc(statusTxt)}</td><td>${esc(detailTxt)}</td></tr>`;
+  });
+  const html = `<div class="pdf-title">Jadual Kelas — ${esc(selKelas)}</div>
+    <div class="pdf-sub">${esc(board.dayName || '')} · ${esc(getDate())}${!board.published ? ' · (Draf, belum disahkan)' : ''}</div>
+    <table><thead><tr><th>Waktu</th><th>Masa</th><th>Status</th><th>Butiran</th></tr></thead><tbody>${rows}</tbody></table>`;
+  writePrintWindow(win, html, `Jadual Kelas - ${selKelas} - ${getDate()}`);
+}
+
 gatePage('login', async () => {
   const lists = await loadStaticLists();
   teachersList = lists.teachersList; classList = lists.classList;
@@ -299,6 +375,8 @@ gatePage('login', async () => {
   $('btn-refresh').addEventListener('click', onDateChange);
   $('kelas-select').addEventListener('change', onKelasChange);
   $('btn-change-teacher').addEventListener('click', changeTeacher);
+  $('btn-print-saya').addEventListener('click', printSaya);
+  $('btn-print-kelas').addEventListener('click', printKelas);
   $('btn-clear-search').addEventListener('click', () => { $('tsearch').value = ''; renderDD(''); openDD(); $('tsearch').focus(); });
   $('tsearch').addEventListener('input', () => { renderDD($('tsearch').value); openDD(); });
   $('tsearch').addEventListener('focus', () => { renderDD($('tsearch').value); openDD(); });

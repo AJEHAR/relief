@@ -14,8 +14,25 @@ export { ABSENT_REASONS };
 // ── Cache ringkas dalam memori (elak baca Firestore berulang) ──
 let _teachersCache = null;
 let _masterCache = null;
+let _customSlotsCache = null;
 
-export function invalidateCache() { _teachersCache = null; _masterCache = null; }
+export function invalidateCache() { _teachersCache = null; _masterCache = null; _customSlotsCache = null; }
+
+const DEFAULT_CUSTOM_SLOTS = [
+  { id: 'REHAT_DEFAULT', label: 'Rehat', start: '10.10am', end: '10.30am', days: ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat'] }
+];
+
+export async function getCustomSlots() {
+  if (_customSlotsCache) return _customSlotsCache;
+  const snap = await getDoc(doc(dbFs, 'settings', 'customSlots'));
+  _customSlotsCache = snap.exists() && Array.isArray(snap.data().slots) ? snap.data().slots : DEFAULT_CUSTOM_SLOTS;
+  return _customSlotsCache;
+}
+export async function saveCustomSlots(slots) {
+  await setDoc(doc(dbFs, 'settings', 'customSlots'), { slots });
+  _customSlotsCache = slots;
+  return { success: true };
+}
 
 export async function getTeacherList() {
   if (_teachersCache) return _teachersCache;
@@ -45,6 +62,7 @@ export async function getDailyBoard(dateStr) {
   const snap = await getDoc(ref);
   const teachers = await getTeacherList();
   const master = await getMasterRows();
+  const customSlots = await getCustomSlots();
 
   let absentIds = [], assignments = {}, absentReasons = {}, status = 'draft', exists = false;
   if (snap.exists()) {
@@ -56,7 +74,7 @@ export async function getDailyBoard(dateStr) {
     exists = true;
   }
 
-  const boardData = buildBoardData(master, teachers, dateStr, absentIds, assignments, absentReasons);
+  const boardData = buildBoardData(master, teachers, dateStr, absentIds, assignments, absentReasons, customSlots);
   return { success: true, exists, date: dateStr, absentIds, assignments, absentReasons, status, ...boardData };
 }
 
@@ -244,6 +262,7 @@ export async function getGuruPageData(dateStr) {
   const teachers = await getTeacherList();
   const classList = await getClassList();
   const master = await getMasterRows();
+  const customSlots = await getCustomSlots();
   const snap = await getDoc(doc(dbFs, 'dailyBoard', dateStr));
 
   let absentIds = [], assignments = {}, absentReasons = {}, status = 'draft';
@@ -253,7 +272,7 @@ export async function getGuruPageData(dateStr) {
     absentReasons = d.absentReasons || {}; status = d.status || 'draft';
   }
 
-  const boardData = buildBoardDataLight(master, dateStr, absentIds, assignments, absentReasons);
+  const boardData = buildBoardDataLight(master, dateStr, absentIds, assignments, absentReasons, customSlots);
   const board = { ...boardData, success: true, published: status === 'confirmed', status, date: dateStr, absentReasons };
   return { success: true, teachers, classList, board };
 }
