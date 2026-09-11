@@ -266,3 +266,38 @@ export async function listUsers() {
 export async function setUserRole(uid, role) {
   await updateDoc(doc(dbFs, 'users', uid), { role });
 }
+export async function deleteUserProfile(uid) {
+  await deleteDoc(doc(dbFs, 'users', uid));
+}
+
+// ── Reset Data (fasa testing) ──
+async function deleteAllDocsIn(colName) {
+  const snap = await getDocs(collection(dbFs, colName));
+  const docs = snap.docs;
+  for (let i = 0; i < docs.length; i += 400) {
+    const b = writeBatch(dbFs);
+    docs.slice(i, i + 400).forEach(d => b.delete(d.ref));
+    await b.commit();
+  }
+  return docs.length;
+}
+
+export async function resetSection(section) {
+  let count = 0;
+  if (section === 'teachers') { count = await deleteAllDocsIn('teachers'); invalidateCache(); }
+  else if (section === 'masterTimetable') { count = await deleteAllDocsIn('masterTimetable'); invalidateCache(); }
+  else if (section === 'dailyBoard') { count = await deleteAllDocsIn('dailyBoard'); }
+  else if (section === 'reliefRecords') { count = await deleteAllDocsIn('reliefRecords'); }
+  else if (section === 'logo') { await setDoc(doc(dbFs, 'settings', 'logo'), { base64: null }); count = 1; }
+  else if (section === 'users') { count = await deleteAllDocsIn('users'); }
+  return count;
+}
+
+/** Padam SEMUA data operasi (guru, jadual, papan harian, arkib, logo).
+ * TIDAK sertakan 'users' (role/pengguna) — sengaja berasingan, lebih sensitif. */
+export async function resetAllOperationalData() {
+  const sections = ['teachers', 'masterTimetable', 'dailyBoard', 'reliefRecords', 'logo'];
+  let total = 0;
+  for (const s of sections) total += await resetSection(s);
+  return total;
+}

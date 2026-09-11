@@ -4,12 +4,12 @@ import * as db from './db.js';
 import { processASCXML } from './xml-import.js';
 import { $, esc, escJs, toast, showConfirm } from './ui-utils.js';
 
-initNav('admin');
+initNav();
 
 let pendingLogoBase64 = undefined;
 
 function switchSub(sub) {
-  ['xml', 'logo', 'pengguna'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
+  ['xml', 'logo', 'pengguna', 'reset'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
   if (sub === 'logo') loadAdminLogoPreview();
   if (sub === 'pengguna') loadUserMgmt();
 }
@@ -80,13 +80,66 @@ async function loadUserMgmt() {
       <option value="pending" ${u.role === 'pending' ? 'selected' : ''}>Belum Disahkan</option>
       <option value="guru" ${u.role === 'guru' ? 'selected' : ''}>Guru</option>
       <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
-    </select></div>`).join('');
+    </select>
+    <button class="btn-ghost btn-sm btn-del-user" data-uid="${esc(u.uid)}" data-name="${esc(u.name || u.email)}" style="color:#dc2626;margin-left:6px;" title="Padam profil pengguna ini"><i class="fas fa-trash"></i></button>
+    </div>`).join('');
   wrap.querySelectorAll('.role-select').forEach(sel => sel.addEventListener('change', () => setUserRoleAction(sel.dataset.uid, sel.value)));
+  wrap.querySelectorAll('.btn-del-user').forEach(btn => btn.addEventListener('click', () => deleteUserAction(btn.dataset.uid, btn.dataset.name)));
 }
 async function setUserRoleAction(uid, role) {
   await db.setUserRole(uid, role);
   toast('Role dikemaskini.', 'success');
   if (uid === authState.user?.uid) location.reload();
+}
+function deleteUserAction(uid, name) {
+  showConfirm({
+    title: 'Padam Profil Pengguna',
+    msg: `Padam profil "${name}" dari sistem? Ini cuma buang rekod role/pautan guru dalam sistem ni — akaun Google dia sendiri TIDAK dipadam. Dia boleh log masuk semula lepas ni (akan mula semula sebagai "Belum Disahkan").`,
+    okLabel: 'Padam', okType: 'warn',
+    onOk: async () => {
+      await db.deleteUserProfile(uid);
+      toast('Profil dipadam.', 'success');
+      if (uid === authState.user?.uid) location.reload();
+      else loadUserMgmt();
+    }
+  });
+}
+
+// ── Reset Data ──
+function logReset(msg, isError) {
+  const el = $('reset-log');
+  el.innerHTML = `<span style="color:${isError ? '#dc2626' : '#059669'};">${esc(msg)}</span>`;
+}
+function wireResetButtons() {
+  document.querySelectorAll('.reset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const section = btn.dataset.section;
+      const label = btn.textContent.trim();
+      showConfirm({
+        title: 'Padam Data', msg: `Padam "${label}"? Tindakan ini KEKAL, tiada cara nak undo. Pastikan anda memang dalam fasa testing.`,
+        okLabel: 'Ya, Padam', okType: 'warn',
+        onOk: async () => {
+          try {
+            const n = await db.resetSection(section);
+            logReset(`✅ Berjaya padam (${n} rekod terjejas) — ${label}`);
+          } catch (e) { logReset('❌ Ralat: ' + e.message, true); }
+        }
+      });
+    });
+  });
+  $('btn-reset-all').addEventListener('click', () => {
+    showConfirm({
+      title: '⚠️ PADAM SEMUA DATA OPERASI',
+      msg: 'Ini akan padam SEMUA: senarai guru, jadual induk, papan harian (semua tarikh), arkib, dan logo sekolah. TIDAK termasuk senarai Pengguna. Tindakan ini KEKAL. Anda pasti?',
+      okLabel: 'Ya, PADAM SEMUA', okType: 'warn',
+      onOk: async () => {
+        try {
+          const n = await db.resetAllOperationalData();
+          logReset(`✅ Semua data operasi dipadam (${n} rekod terjejas).`);
+        } catch (e) { logReset('❌ Ralat: ' + e.message, true); }
+      }
+    });
+  });
 }
 
 gatePage('admin', async () => {
@@ -94,6 +147,7 @@ gatePage('admin', async () => {
   $('logoFileInput').addEventListener('change', previewLogo);
   $('btn-save-logo').addEventListener('click', saveLogoAction);
   $('btn-remove-logo').addEventListener('click', removeLogoAction);
+  wireResetButtons();
   switchSub(initialSub('xml'));
   window.addEventListener('hashchange', () => switchSub(initialSub('xml')));
 });

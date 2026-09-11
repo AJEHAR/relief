@@ -4,7 +4,7 @@ import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { $, esc, escJs, escRx, todayStr, loadingCard, setBanner, toast } from './ui-utils.js';
 
-initNav('ruang-guru');
+initNav();
 
 let teachersList = [], classList = [];
 let guruBoard = null;

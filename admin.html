@@ -74,6 +74,33 @@
       </div>
     </div>
 
+    <!-- SUBPAGE: Reset Data -->
+    <div id="sub-reset" class="hidden fade-in">
+      <div class="card" style="border:1.5px solid #fecaca;">
+        <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#dc2626,#991b1b);"><i class="fas fa-exclamation-triangle"></i></div>
+          <div><div class="card-head-title">Reset Data (Fasa Testing)</div><div class="card-head-sub">⚠️ Tindakan ini KEKAL — tiada undo. Guna dengan berhati-hati.</div></div></div>
+        <div class="card-body">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn-ghost btn-sm reset-btn" data-section="teachers" style="justify-content:flex-start;color:#b91c1c;">
+              <i class="fas fa-users" style="width:18px;"></i> Padam Senarai Guru (teachers)</button>
+            <button class="btn-ghost btn-sm reset-btn" data-section="masterTimetable" style="justify-content:flex-start;color:#b91c1c;">
+              <i class="fas fa-calendar-alt" style="width:18px;"></i> Padam Jadual Induk (masterTimetable)</button>
+            <button class="btn-ghost btn-sm reset-btn" data-section="dailyBoard" style="justify-content:flex-start;color:#b91c1c;">
+              <i class="fas fa-clipboard-list" style="width:18px;"></i> Padam Semua Papan Harian (dailyBoard — semua tarikh)</button>
+            <button class="btn-ghost btn-sm reset-btn" data-section="reliefRecords" style="justify-content:flex-start;color:#b91c1c;">
+              <i class="fas fa-archive" style="width:18px;"></i> Padam Arkib (reliefRecords — semua tarikh)</button>
+            <button class="btn-ghost btn-sm reset-btn" data-section="logo" style="justify-content:flex-start;color:#b91c1c;">
+              <i class="fas fa-image" style="width:18px;"></i> Padam Logo Sekolah</button>
+          </div>
+          <hr style="margin:18px 0;border:none;border-top:1.5px dashed #fecaca;">
+          <button class="btn btn-sm" id="btn-reset-all" style="background:#dc2626;color:#fff;width:100%;">
+            <i class="fas fa-bomb"></i> PADAM SEMUA DATA OPERASI (guru + jadual + papan + arkib + logo)</button>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:8px;">Nota: "Padam Semua" TIDAK sertakan senarai Pengguna/role (bahagian tu berasingan, urus di tab Pengurusan Pengguna).</div>
+          <div id="reset-log" style="margin-top:14px;font-size:.78rem;font-weight:700;"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 

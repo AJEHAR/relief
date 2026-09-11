@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 import {
   auth, dbFs, googleProvider, signInWithPopup, fbSignOut, onAuthStateChanged,
-  doc, getDoc, setDoc, updateDoc, serverTimestamp
+  doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp
 } from './firebase-init.js';
 import { BOOTSTRAP_ADMIN_EMAILS } from './firebase-config.js';
 
@@ -62,6 +62,14 @@ export async function setMyTeacherId(teacherId) {
   await updateDoc(ref, { teacherId });
   authState.profile = { ...authState.profile, teacherId };
   notify();
+}
+
+/** Padam profil/role sendiri dari sistem (bukan padam akaun Google) + log keluar. */
+export async function deleteMyProfile() {
+  if (!authState.user) return;
+  const uid = authState.user.uid;
+  await deleteDoc(doc(dbFs, 'users', uid));
+  await fbSignOut(auth);
 }
 
 export function isAdmin() {

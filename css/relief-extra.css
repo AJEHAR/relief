@@ -69,6 +69,7 @@
 @media (max-width:899px){
   .hamburger-btn{display:block;}
   .page-nav-desktop{display:none;}
+  #auth-box{display:none;}
 }
 
 /* Desktop dropdown */
@@ -106,16 +107,36 @@
 /* ═══════════════════════════════════════════════════
    RESPONSIVE WIDTH — ikut saiz skrin sebenar (bukan kunci 900px)
    ═══════════════════════════════════════════════════ */
-.main{width:100%;max-width:1400px;margin:0 auto;padding:16px 20px 70px;box-sizing:border-box;}
-.navbar-inner{max-width:1400px;}
+.main{width:100%;max-width:1800px;margin:0 auto;padding:16px 24px 70px;box-sizing:border-box;}
+.navbar-inner{max-width:1800px;}
 
 @media (max-width:640px){
   .main{padding:14px 12px 70px;}
   .navbar-inner{padding:0 12px;}
 }
 @media (min-width:641px) and (max-width:1023px){
-  .main{max-width:92%;}
+  .main{max-width:94%;}
 }
 @media (min-width:1024px){
-  .main{max-width:min(94%, 1400px);}
+  .main{max-width:97%;padding:18px 26px 70px;}
+}
+@media (min-width:1600px){
+  .main{max-width:1800px;}
+}
+
+/* ═══════════════════════════════════════════════════
+   BAR TINDAKAN TETAP DI BAWAH (Jana PDF / Sahkan Tapak)
+   ═══════════════════════════════════════════════════ */
+#confirm-card{
+  position:fixed;left:0;right:0;bottom:0;
+  max-width:1800px;margin:0 auto;border-radius:0;
+  z-index:150;box-shadow:0 -6px 20px rgba(15,32,68,.15);
+  border-left:none;border-right:none;border-bottom:none;
+}
+#sub-papan{padding-bottom:88px;}
+@media (max-width:640px){
+  #confirm-card .card-body{flex-direction:column;align-items:stretch !important;gap:10px;}
+  #confirm-card .card-body > div:last-child{display:flex;gap:8px;}
+  #confirm-card .card-body > div:last-child button{flex:1;}
+  #sub-papan{padding-bottom:104px;}
 }

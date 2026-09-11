@@ -2,10 +2,10 @@ import { initNav, gatePage, initialSub } from './nav.js';
 import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { getReliefFromAssignment } from './board-engine.js';
-import { exportHtmlToPdf } from './pdf-export.js';
+import { openPrintWindow, writePrintWindow } from './pdf-export.js';
 import { $, esc, escJs, todayStr, toast, showConfirm } from './ui-utils.js';
 
-initNav('penyelaras');
+initNav();
 
 let teachersList = [];
 let currentBoard = null;
@@ -335,6 +335,7 @@ function confirmBoard() {
 
 async function generatePdf() {
   if (!currentBoard) return;
+  const win = openPrintWindow();
   const ids = currentBoard.absentIds || [];
   let rows = '';
   ids.forEach(tid => {
@@ -351,7 +352,7 @@ async function generatePdf() {
   const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(currentBoard.dayName || '')}</div>
     <div class="pdf-sub">${esc(getDate())}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await exportHtmlToPdf(html, `Jadual_Guru_Ganti_${getDate()}`);
+  writePrintWindow(win, html, `Jadual Guru Ganti ${getDate()}`);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -421,12 +422,13 @@ function renderHistory(records) {
   ct.innerHTML = h;
 }
 async function printArchive() {
+  const win = openPrintWindow();
   const records = await db.getReliefByDate(getDate());
-  if (!records.length) return toast('Tiada rekod untuk dieksport.', 'error');
+  if (!records.length) { win.close(); return toast('Tiada rekod untuk dieksport.', 'error'); }
   let rows = records.map(r => `<tr><td>${esc(r.period)}</td><td>${esc(r.time)}</td><td>${esc(r.className)}</td><td>${esc(r.subject)}</td><td>${esc(r.absentTeacher)}</td><td class="green">${esc(r.reliefTeacher)}</td><td>${esc(r.note) || ''}</td></tr>`).join('');
   const html = `<div class="pdf-title">Arkib Guru Ganti</div><div class="pdf-sub">${esc(getDate())}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await exportHtmlToPdf(html, `Arkib_Guru_Ganti_${getDate()}`);
+  writePrintWindow(win, html, `Arkib Guru Ganti ${getDate()}`);
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -2,7 +2,7 @@ import { initNav, gatePage } from './nav.js';
 import * as db from './db.js';
 import { $, esc, todayStr, loadingCard, setBanner, toast } from './ui-utils.js';
 
-initNav('jadual');
+initNav();
 
 let guruBoard = null;
 

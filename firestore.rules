@@ -66,6 +66,10 @@ service cloud.firestore {
 
       // Update field 'role' — admin sahaja.
       allow update: if isAdmin();
+
+      // Padam — admin boleh padam sesiapa; pengguna boleh padam profil sendiri
+      // (cth: bersihkan akaun pendaftaran berganda/silap).
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
     }
   }
 }
