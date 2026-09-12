@@ -426,11 +426,21 @@ async function loadHistory() {
 function renderHistory(records) {
   const ct = $('history-container');
   if (!records.length) { ct.innerHTML = `<div class="card"><div class="state-box"><div class="s-icon">🗂️</div><div class="s-title">Tiada Rekod</div><div class="s-sub">Tiada rekod guru ganti disahkan untuk tarikh ini.</div></div></div>`; return; }
-  let h = `<div class="card"><div class="table-wrap"><table class="m-table"><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>`;
+  let h = `<div class="card"><div class="rl-list">`;
   records.forEach(r => {
-    h += `<tr><td>${esc(r.period)}</td><td>${esc(r.time)}</td><td>${esc(r.className)}</td><td>${esc(r.subject)}</td><td>${esc(r.absentTeacher)}</td><td>${esc(r.reliefTeacher)}</td><td>${esc(r.note) || '—'}</td></tr>`;
+    h += `<div class="rl-row">
+      <div class="rl-period"><span class="rl-wkt">${esc(r.period)}</span><span class="rl-time">${esc(r.time).replace(' - ', '<br>')}</span></div>
+      <div class="rl-main">
+        <div class="rl-line1"><span class="c-pill">${esc(r.className)}</span><span class="rl-subj">${esc(r.subject) || '—'}</span></div>
+        <div class="rl-line2">
+          <i class="fas fa-check-circle" style="color:var(--success);font-size:.65rem;"></i><span class="rl-relief">${esc(r.reliefTeacher)}</span>
+          <span class="rl-arrow">ganti</span><i class="fas fa-user-slash" style="color:var(--danger);font-size:.6rem;"></i><span class="rl-absent">${esc(r.absentTeacher) || '—'}</span>
+        </div>
+        ${r.note ? `<div class="rl-note"><i class="fas fa-sticky-note"></i>${esc(r.note)}</div>` : ''}
+      </div>
+    </div>`;
   });
-  h += `</tbody></table></div></div>`;
+  h += `</div></div>`;
   ct.innerHTML = h;
 }
 async function printArchive() {

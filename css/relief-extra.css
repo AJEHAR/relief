@@ -157,3 +157,34 @@
   #confirm-card .card-body > div:last-child button{flex:1;}
   #sub-papan{padding-bottom:104px;}
 }
+
+/* ═══════════════════════════════════════════════════
+   DATE-ROW responsif — elak terkeluar bingkai di phone
+   bila ada >2 item (tarikh + Muat Semula + Jana PDF)
+   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   SENARAI GURU GANTI — versi padat (bukan jadual 7 lajur)
+   elak scroll kiri-kanan, lebih pendek menegak
+   ═══════════════════════════════════════════════════ */
+.date-row{flex-wrap:wrap;}
+.rl-list{display:flex;flex-direction:column;}
+.rl-row{display:flex;gap:12px;align-items:flex-start;padding:10px 16px;border-bottom:1px solid var(--border);}
+.rl-row:last-child{border-bottom:none;}
+.rl-period{flex-shrink:0;width:58px;text-align:center;}
+.rl-wkt{display:block;background:var(--navy);color:#fff;border-radius:8px;font-size:.68rem;font-weight:800;padding:3px 0;margin-bottom:3px;}
+.rl-time{display:block;font-size:.6rem;color:var(--muted);font-family:'JetBrains Mono',monospace;line-height:1.25;}
+.rl-main{flex:1;min-width:0;}
+.rl-line1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;}
+.rl-subj{font-weight:700;font-size:.8rem;color:var(--text);}
+.rl-line2{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:.76rem;}
+.rl-relief{color:var(--success);font-weight:800;}
+.rl-arrow{color:var(--muted);font-size:.68rem;}
+.rl-absent{color:var(--danger);font-weight:600;}
+.rl-note{margin-top:3px;font-size:.68rem;color:#92400e;background:#fffbeb;border-radius:6px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px;}
+@media (min-width:640px){
+  .rl-row{padding:11px 20px;}
+}
+@media (max-width:520px){
+  .date-row{flex-direction:column;align-items:stretch;}
+  .date-row > *{width:100%;margin-left:0 !important;justify-content:center;}
+}
