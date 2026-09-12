@@ -170,21 +170,30 @@
 /* ═══════════════════════════════════════════════════
    SENARAI GURU GANTI — dikumpulkan ikut guru tidak hadir
    ═══════════════════════════════════════════════════ */
-.grp-list{display:flex;flex-direction:column;}
-.grp-head{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f8fafc;border-top:6px solid #fff;}
-.grp-head:first-child{border-top:none;}
+.grp-list{display:flex;flex-direction:column;gap:14px;padding:14px;background:#eef1f6;}
+.grp-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;overflow:hidden;}
+.grp-head{display:flex;align-items:center;gap:10px;padding:14px 16px;background:#f8fafc;}
 .grp-av{width:34px;height:34px;border-radius:50%;background:#fef2f2;color:#b91c1c;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.7rem;flex-shrink:0;}
-.grp-name{font-weight:800;font-size:.85rem;color:var(--navy);}
+.grp-name{font-weight:800;font-size:.85rem;color:#b91c1c;}
 .grp-meta{font-size:.68rem;color:var(--muted);}
-.grow{display:flex;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);}
+.grow{display:flex;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border);}
 .grow:last-of-type{border-bottom:none;}
-.gnum{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:#fff;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:var(--navy);position:relative;}
-.gnum span{position:absolute;top:38px;left:50%;transform:translateX(-50%);font-size:.55rem;color:var(--muted);font-family:'JetBrains Mono',monospace;white-space:nowrap;}
+.gnum-col{flex-shrink:0;width:56px;text-align:center;}
+.gnum{width:34px;height:34px;border-radius:50%;background:#fff;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:var(--navy);margin:0 auto 4px;}
+.gtime{font-size:.58rem;color:var(--muted);font-family:'JetBrains Mono',monospace;line-height:1.35;}
 .l-class{font-size:.68rem;color:#0369a1;font-weight:800;}
 .l-subj{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);margin-top:2px;}
 .l-subj i{font-size:.72rem;color:#0d9488;flex-shrink:0;}
-.l-name{font-weight:800;font-size:.85rem;color:var(--navy);margin-top:2px;}
+.l-name{font-weight:800;font-size:.85rem;color:#111827;margin-top:3px;}
 .grow-note{margin-top:4px;font-size:.66rem;color:#92400e;background:#fffbeb;border-radius:6px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px;}
+
+/* Desktop = jadual 7-lajur asal; Mobile/tablet = grouping baru */
+.desktop-table-view{display:none;}
+.mobile-grouped-view{display:block;}
+@media (min-width:900px){
+  .desktop-table-view{display:block;}
+  .mobile-grouped-view{display:none;}
+}
 @media (min-width:640px){
   .grow{padding:11px 20px;}
 }

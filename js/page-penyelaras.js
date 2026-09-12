@@ -444,15 +444,38 @@ function renderHistory(records) {
     return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
   }));
   const absentNames = Object.keys(byAbsent).sort((a, b) => a.localeCompare(b));
+  const recordsSorted = [...records].sort((a, b) => {
+    const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
+    return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
+  });
 
-  let h = `<div class="card"><div class="grp-list">`;
+  let h = `<div class="card">`;
+
+  // ── Versi DESKTOP: jadual 7-lajur asal ──
+  h += `<div class="desktop-table-view"><div class="table-wrap"><table class="m-table"><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Tidak Hadir</th><th>Catatan</th></tr></thead><tbody>`;
+  recordsSorted.forEach(r => {
+    h += `<tr>
+      <td><span class="p-pill">${esc(r.period)}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);white-space:nowrap;">${esc(r.time)}</td>
+      <td><span class="c-pill">${esc(r.className)}</span></td>
+      <td style="font-weight:700;font-size:.82rem;">${esc(r.subject) || '—'}</td>
+      <td style="font-weight:800;color:var(--navy);">${esc(r.reliefTeacher)}</td>
+      <td style="color:var(--muted);">${esc(r.absentTeacher) || '—'}</td>
+      <td style="min-width:130px;">${r.note ? `<div class="note-chip"><i class="fas fa-sticky-note"></i>${esc(r.note)}</div>` : '<span style="color:#cbd5e1;font-size:.7rem;">—</span>'}</td>
+    </tr>`;
+  });
+  h += `</tbody></table></div></div>`;
+
+  // ── Versi MOBILE/TABLET: dikumpulkan ikut guru tidak hadir ──
+  h += `<div class="mobile-grouped-view"><div class="grp-list">`;
   absentNames.forEach(name => {
     const g = byAbsent[name];
-    h += `<div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
+    h += `<div class="grp-card"><div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
       <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
     g.slots.forEach(r => {
+      const [tStart, tEnd] = String(r.time || '').split(' - ');
       h += `<div class="grow">
-        <div class="gnum">${esc(r.period)}<span>${esc((r.time || '').split(' - ')[0])}</span></div>
+        <div class="gnum-col"><div class="gnum">${esc(r.period)}</div><div class="gtime">${esc(tStart || '')}<br>${esc(tEnd || '')}</div></div>
         <div style="flex:1;min-width:0;">
           <div class="l-class">${esc(r.className)}</div>
           <div class="l-subj"><i class="fas fa-book"></i>${esc(r.subject) || '—'}</div>
@@ -461,8 +484,11 @@ function renderHistory(records) {
         </div>
       </div>`;
     });
+    h += `</div>`;
   });
   h += `</div></div>`;
+
+  h += `</div>`;
   ct.innerHTML = h;
 }
 async function printArchive() {
