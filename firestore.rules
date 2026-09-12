@@ -17,7 +17,9 @@ service cloud.firestore {
     // yang disenaraikan sahaja.
     function isBootstrapAdmin() {
       return isSignedIn() && request.auth.token.email in [
-        'azharuddinhaniff@gmail.com'
+        // ⚠️ GANTIKAN dengan emel admin pertama anda — MESTI SAMA PERSIS
+        // dengan BOOTSTRAP_ADMIN_EMAILS dalam js/firebase-config.js.
+        'gantikan-dengan-emel-admin-anda@gmail.com'
       ];
     }
 

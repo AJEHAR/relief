@@ -31,11 +31,16 @@ function timeToMins(t) {
   return h * 60 + min;
 }
 
-/** Format lama (string) & baru ({relief,note}) assignment value */
+/** Format lama (string) & baru ({relief,note,reliefId}) assignment value.
+ * NOTA (fix): "reliefId" ditambah supaya padanan guru ganti boleh dibuat ikut
+ * ID (stabil) bukan semata-mata nama (teks) — elak masalah nama pendua atau
+ * nama guru disunting selepas tugasan dibuat. Rekod LAMA yang tiada reliefId
+ * (dari sebelum fix ni) tetap berfungsi — reliefId akan kosong dan sistem
+ * jatuh balik (fallback) ke padanan nama macam sebelum ini. */
 export function getReliefFromAssignment(val) {
-  if (!val) return { relief: '', note: '' };
-  if (typeof val === 'string') return { relief: val, note: '' };
-  return { relief: String(val.relief || ''), note: String(val.note || '') };
+  if (!val) return { relief: '', note: '', reliefId: '' };
+  if (typeof val === 'string') return { relief: val, note: '', reliefId: '' };
+  return { relief: String(val.relief || ''), note: String(val.note || ''), reliefId: String(val.reliefId || '') };
 }
 
 function buildPeriods(masterRows, customSlots, dayName) {
@@ -79,6 +84,7 @@ export function buildBoardData(masterRows, teachersList, dateStr, absentIds, ass
   absentReasons = absentReasons || {};
   const dayName = getMalayDayName(new Date(dateStr + 'T00:00:00'));
   const absentSet = new Set((absentIds || []).map(id => String(id).trim()));
+  const teachersByName = new Map(teachersList.map(t => [t.name, t])); // elak scan linear berulang
 
   const todaySlots = masterRows.filter(row => String(row.day || '').toLowerCase() === dayName.toLowerCase());
   const periods = buildPeriods(masterRows, customSlots, dayName);
@@ -111,13 +117,15 @@ export function buildBoardData(masterRows, teachersList, dateStr, absentIds, ass
     teacherTeachingMap[tid].add(pid);
   });
 
+  const teachersById = new Map(teachersList.map(t => [String(t.id), t]));
   const teacherReliefMap = {};
   Object.entries(assignments || {}).forEach(([key, val]) => {
-    const { relief: reliefName } = getReliefFromAssignment(val);
+    const { relief: reliefName, reliefId } = getReliefFromAssignment(val);
     if (!reliefName) return;
     const periodId = key.split('|')[1];
     if (rehatIds.has(periodId)) return;
-    const t = teachersList.find(x => x.name === reliefName);
+    // Utamakan reliefId (stabil) — fallback ke padanan nama utk rekod lama.
+    const t = (reliefId && teachersById.get(reliefId)) || teachersByName.get(reliefName);
     if (t) {
       if (!teacherReliefMap[t.id]) teacherReliefMap[t.id] = new Set();
       teacherReliefMap[t.id].add(periodId);
@@ -230,9 +238,15 @@ export function buildBoardDataLight(masterRows, dateStr, absentIds, assignments,
     });
   });
 
+  // NOTA (fix): reliefDuties disimpan di bawah 2 jenis kunci —
+  //  1) reliefId (ID guru, stabil) — kunci UTAMA & disyorkan utk konsumer baru.
+  //  2) reliefName (teks nama) — kekal utk keserasian rekod LAMA (sebelum
+  //     reliefId wujud) & sebagai fallback.
+  // Sebab: padanan ikut nama semata-mata pecah bila ada 2 guru nama sama,
+  // atau nama guru disunting selepas tugasan dibuat.
   const reliefDuties = {};
   Object.entries(assignments || {}).forEach(([key, val]) => {
-    const { relief: reliefName, note } = getReliefFromAssignment(val);
+    const { relief: reliefName, note, reliefId } = getReliefFromAssignment(val);
     if (!reliefName) return;
     const parts = key.split('|');
     if (parts.length < 3) return;
@@ -240,8 +254,7 @@ export function buildBoardDataLight(masterRows, dateStr, absentIds, assignments,
     const slotArr = (teacherMap[teacherId] && teacherMap[teacherId][periodId]) || [];
     const slot = slotArr.find(s => s.className === className) || slotArr[0];
     const period = periods.find(p => p.id === periodId);
-    if (!reliefDuties[reliefName]) reliefDuties[reliefName] = [];
-    reliefDuties[reliefName].push({
+    const duty = {
       period: periodId,
       time: period ? (period.start + ' \u2013 ' + period.end) : '',
       className,
@@ -249,7 +262,13 @@ export function buildBoardDataLight(masterRows, dateStr, absentIds, assignments,
       absentTeacher: (slot && slot.teacherName) || '',
       absentReason: (slot && slot.absentReason) || '',
       note
-    });
+    };
+    if (!reliefDuties[reliefName]) reliefDuties[reliefName] = [];
+    reliefDuties[reliefName].push(duty);
+    if (reliefId && reliefId !== reliefName) {
+      if (!reliefDuties[reliefId]) reliefDuties[reliefId] = [];
+      reliefDuties[reliefId].push(duty);
+    }
   });
 
   // teacherSchedule — JADUAL PENUH setiap guru (bahagian dikunci di belakang login)

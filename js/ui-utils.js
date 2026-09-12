@@ -3,6 +3,10 @@
 // ═══════════════════════════════════════════════════════════
 export function $(id) { return document.getElementById(id); }
 export function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+/** Escape utk letak dalam JS STRING LITERAL sahaja (cth: dalam <script> inline).
+ * JANGAN guna untuk nilai atribut HTML (data-*, dll) — guna esc() untuk itu,
+ * sebab escJs() escape guna backslash yang HTML TIDAK faham sebagai escape
+ * tanda petik (attribute boleh "pecah" kalau nilai ada tanda petik). */
 export function escJs(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
 export function escRx(s) { return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 export function todayStr() {
@@ -10,6 +14,83 @@ export function todayStr() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 export function loadingCard() { return `<div class="card"><div class="state-box"><div class="spinner"></div><div class="s-sub">Memuatkan data...</div></div></div>`; }
+
+// ── Skeleton generators — bentuk mengikut kandungan sebenar (kad berkumpulan,
+// jadual, grid) supaya peralihan ke data sebenar tak "melompat" ── 
+export function skeletonGroupedList(groups = 2, rowsPerGroup = 3) {
+  let html = '';
+  for (let g = 0; g < groups; g++) {
+    html += `<div class="sk-card">
+      <div class="sk-grp-head">
+        <div class="sk-bar sk-circle" style="width:34px;height:34px;"></div>
+        <div style="flex:1;"><div class="sk-bar" style="width:55%;height:13px;margin-bottom:6px;"></div><div class="sk-bar" style="width:35%;height:10px;"></div></div>
+      </div>`;
+    for (let r = 0; r < rowsPerGroup; r++) {
+      html += `<div class="sk-grow">
+        <div class="sk-bar sk-circle" style="width:34px;height:34px;"></div>
+        <div style="flex:1;">
+          <div class="sk-bar" style="width:40%;height:10px;margin-bottom:6px;"></div>
+          <div class="sk-bar" style="width:65%;height:11px;margin-bottom:6px;"></div>
+          <div class="sk-bar" style="width:50%;height:13px;"></div>
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  return html;
+}
+
+export function skeletonTable(rows = 5) {
+  let html = '';
+  for (let i = 0; i < rows; i++) {
+    html += `<div class="sk-table-row">
+      <div class="sk-bar" style="width:34px;height:22px;flex-shrink:0;"></div>
+      <div class="sk-bar" style="width:70px;height:12px;flex-shrink:0;"></div>
+      <div class="sk-bar" style="width:60px;height:18px;flex-shrink:0;"></div>
+      <div class="sk-bar" style="flex:1;height:12px;"></div>
+      <div class="sk-bar" style="width:90px;height:12px;flex-shrink:0;"></div>
+    </div>`;
+  }
+  return `<div class="sk-card">${html}</div>`;
+}
+
+export function skeletonGrid(rows = 6, cols = 6) {
+  let html = `<div class="sk-grid-wrap">`;
+  for (let r = 0; r < rows; r++) {
+    html += `<div class="sk-grid-row"><div class="sk-bar" style="width:90px;height:44px;flex-shrink:0;"></div>`;
+    for (let c = 0; c < cols; c++) html += `<div class="sk-bar" style="width:58px;height:44px;flex-shrink:0;"></div>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+export function skeletonTimetableRows(rows = 6) {
+  let html = '';
+  for (let i = 0; i < rows; i++) {
+    html += `<div class="sk-grow" style="padding:11px 16px;">
+      <div class="sk-bar sk-circle" style="width:34px;height:34px;"></div>
+      <div style="flex:1;">
+        <div class="sk-bar" style="width:30%;height:12px;margin-bottom:6px;"></div>
+        <div class="sk-bar" style="width:60%;height:15px;"></div>
+      </div>
+    </div>`;
+  }
+  return `<div class="sk-card">${html}</div>`;
+}
+
+/** Skeleton ringkas — senarai baris kecil (cth: Guru Tambahan, Pengurusan Pengguna) */
+export function skeletonRows(rows = 3) {
+  let html = '';
+  for (let i = 0; i < rows; i++) {
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div class="sk-bar sk-circle" style="width:28px;height:28px;"></div>
+      <div style="flex:1;"><div class="sk-bar" style="width:45%;height:11px;"></div></div>
+      <div class="sk-bar" style="width:60px;height:20px;"></div>
+    </div>`;
+  }
+  return html;
+}
 export function setBanner(el, type, icon, msg) {
   const c = { pending: 'banner-pending', confirmed: 'banner-confirmed', error: 'banner-error' };
   el.className = `status-banner ${c[type] || 'banner-pending'} fade-in`;

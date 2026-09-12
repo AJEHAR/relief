@@ -171,6 +171,11 @@
     /* Slot cell */
     .tt-slot{height:64px;vertical-align:middle;cursor:default;}
     .tt-slot-inner{padding:5px 6px;height:100%;display:flex;flex-direction:column;justify-content:center;gap:1px;}
+    /* Sel dgn >1 kelas SERENTAK (team-teaching/kelas gabungan) — dulu setiap
+       .tt-slot-inner cuba isi 100% drpd 64px tegar SECARA BERASINGAN, jadi
+       bertindan/bengkak. Sekarang tinggi ikut kandungan (auto), padat & kemas. */
+    .tt-slot.tt-slot-multi{height:auto;}
+    .tt-slot.tt-slot-multi .tt-slot-inner{height:auto;min-height:36px;}
 
     /* Slot biasa — biru */
     .tt-slot.s-normal .tt-slot-inner{background:#3b82f6;}

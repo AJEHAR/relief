@@ -3,7 +3,7 @@ import { authState, setMyTeacherId } from './auth.js';
 import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, escJs, escRx, todayStr, loadingCard, setBanner, toast } from './ui-utils.js';
+import { $, esc, escRx, todayStr, setBanner, toast, skeletonTimetableRows } from './ui-utils.js';
 
 initNav();
 
@@ -29,7 +29,7 @@ async function onDateChange() {
 }
 
 async function loadGuruBoardAndRender(which) {
-  $(which === 'saya' ? 'saya-content' : 'kelas-content').innerHTML = loadingCard();
+  $(which === 'saya' ? 'saya-content' : 'kelas-content').innerHTML = skeletonTimetableRows(6);
   try {
     const res = await db.getGuruPageData(getDate());
     guruBoard = res.board;
@@ -74,7 +74,7 @@ function renderSaya() {
 function renderPersonalTimetable(ct, board) {
   const periods = board.periods || [];
   const reliefDuties = board.reliefDuties || {};
-  const myRelief = reliefDuties[selT.name] || [];
+  const myRelief = reliefDuties[selT.id] || reliefDuties[selT.name] || [];
   let mySlots = {};
   if (board.teacherMap && board.teacherMap[selT.id]) mySlots = board.teacherMap[selT.id];
   const reliefByPeriod = {};
@@ -144,13 +144,13 @@ function renderPersonalTimetable(ct, board) {
     </div></div>`;
 }
 
-function printSaya() {
+async function printSaya() {
   if (!selT || !guruBoard) return;
   const win = openPrintWindow();
   const board = guruBoard;
   const periods = board.periods || [];
   const reliefDuties = board.reliefDuties || {};
-  const myRelief = reliefDuties[selT.name] || [];
+  const myRelief = reliefDuties[selT.id] || reliefDuties[selT.name] || [];
   const mySlots = (board.teacherMap && board.teacherMap[selT.id]) || {};
   const reliefByPeriod = {};
   myRelief.forEach(d => { reliefByPeriod[String(d.period)] = d; });
@@ -171,7 +171,7 @@ function printSaya() {
   const html = `<div class="pdf-title">Jadual Hari Ini — ${esc(selT.name)}</div>
     <div class="pdf-sub">${esc(board.dayName || '')} · ${esc(getDate())}${!board.published ? ' · (Draf, belum disahkan)' : ''}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Status</th><th>Butiran</th></tr></thead><tbody>${rows}</tbody></table>`;
-  writePrintWindow(win, html, `Jadual Saya - ${selT.name} - ${getDate()}`);
+  await writePrintWindow(win, html, `Jadual Saya - ${selT.name} - ${getDate()}`);
 }
 
 function changeTeacher() {
@@ -202,11 +202,14 @@ function renderDD(q) {
   const ql = q.trim().toLowerCase();
   dd.innerHTML = f.slice(0, 50).map((t, i) => {
     const hl = ql ? t.name.replace(new RegExp('(' + escRx(ql) + ')', 'gi'), '<em>$1</em>') : t.name;
-    return `<div class="dd-item" data-idx="${i}" onmousedown="RGPage.selectT('${escJs(t.id)}')">
+    return `<div class="dd-item" data-idx="${i}" data-id="${esc(t.id)}">
       <div class="dd-item-avatar">${esc(getInitials(t.name))}</div>
       <span class="dd-item-name">${hl}</span>${t.short ? `<span class="dd-item-short">${esc(t.short)}</span>` : ''}
     </div>`;
   }).join('');
+  // Guna addEventListener + data-id (bukan onmousedown="...id..." inline) —
+  // elak isu HTML-injection kalau id guru (dari import XML luaran) ada aksara istimewa.
+  dd.querySelectorAll('.dd-item').forEach(el => el.addEventListener('mousedown', () => selectT(el.dataset.id)));
   ddActive = -1;
 }
 function openDD() { $('ddwrap').classList.add('open'); }
@@ -215,8 +218,15 @@ document.addEventListener('click', e => { if ($('search-outer') && !$('search-ou
 
 async function selectT(id) {
   const t = teachersList.find(x => x.id === id); if (!t) return;
-  selT = t; closeDD();
-  await setMyTeacherId(id);
+  closeDD();
+  let res = await setMyTeacherId(id);
+  if (!res.success && res.clash) {
+    const ok = confirm(`${res.message}\n\nTeruskan pautkan nama ini ke akaun anda juga? (Kedua-dua akaun akan tertanda sebagai "${t.name}".)`);
+    if (!ok) return;
+    res = await setMyTeacherId(id, { force: true });
+  }
+  if (!res.success) { toast('Gagal simpan pautan nama: ' + res.message, 'error'); return; }
+  selT = t;
   $('saya-pickname').classList.add('hidden');
   $('t-banner').classList.remove('hidden');
   $('t-name').textContent = t.name;
@@ -322,7 +332,7 @@ function renderClassTimetable(ct, board) {
       </div></div>`;
 }
 
-function printKelas() {
+async function printKelas() {
   if (!selKelas || !guruBoard) return;
   const win = openPrintWindow();
   const board = guruBoard;
@@ -362,7 +372,7 @@ function printKelas() {
   const html = `<div class="pdf-title">Jadual Kelas — ${esc(selKelas)}</div>
     <div class="pdf-sub">${esc(board.dayName || '')} · ${esc(getDate())}${!board.published ? ' · (Draf, belum disahkan)' : ''}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Status</th><th>Butiran</th></tr></thead><tbody>${rows}</tbody></table>`;
-  writePrintWindow(win, html, `Jadual Kelas - ${selKelas} - ${getDate()}`);
+  await writePrintWindow(win, html, `Jadual Kelas - ${selKelas} - ${getDate()}`);
 }
 
 gatePage('login', async () => {
@@ -384,8 +394,6 @@ gatePage('login', async () => {
   switchSub(initialSub('saya'));
   window.addEventListener('hashchange', () => switchSub(initialSub('saya')));
 });
-
-window.RGPage = { selectT };
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

@@ -79,9 +79,20 @@ window.importTeachers = async function () {
       id: String(r.ID).trim(), name: String(r.Name).trim(), short: String(r.Short || '').trim(),
       contact: String(r.Contact || ''), email: String(r.Email || '')
     }));
-    log(`  ${list.length} guru dijumpai. Menulis (1 dokumen besar — elak kuota reads)...`);
-    await setDoc(doc(dbFs, 'teachers', 'data'), { list });
-    log(`✅ ${list.length} guru berjaya diimport.`);
+    // NOTA (fix): dulu ni overwrite terus & buang "Guru Tambahan" (EXTRA_) sedia
+    // ada yang mungkin dah ditambah dlm app — sekarang kekalkan mereka, sama
+    // macam kelakuan xml-import.js.
+    log('  Menggabung guru tambahan (EXTRA_) sedia ada...');
+    let existingExtras = [];
+    try {
+      const existingSnap = await getDoc(doc(dbFs, 'teachers', 'data'));
+      const existingList = existingSnap.exists() ? (existingSnap.data().list || []) : [];
+      existingExtras = existingList.filter(t => String(t.id).startsWith('EXTRA_'));
+    } catch (e) { /* tiada data sedia ada lagi, abaikan */ }
+    const fullList = [...list, ...existingExtras];
+    log(`  ${list.length} guru dari CSV + ${existingExtras.length} guru tambahan sedia ada. Menulis (1 dokumen besar — elak kuota reads)...`);
+    await setDoc(doc(dbFs, 'teachers', 'data'), { list: fullList });
+    log(`✅ ${list.length} guru berjaya diimport (${existingExtras.length} guru tambahan dikekalkan).`);
   } catch (e) { log('❌ Ralat: ' + e.message); }
 };
 
@@ -125,9 +136,10 @@ window.importRelief = async function () {
     const items = rows.filter(r => r.Date).map((r, i) => ({
       id: 'R' + Date.now() + '_' + i,
       data: {
-        batchId: r['Batch ID'] || '', date: String(r.Date).trim(), day: r.Day || '',
+        batchId: r.BatchID || r['Batch ID'] || '', date: String(r.Date).trim(), day: r.Day || '',
         period: r.Period || '', time: r.Time || '', className: r.Class || '', subject: r.Subject || '',
-        absentTeacher: r['Absent Teacher'] || '', reliefTeacher: r['Relief Teacher'] || '',
+        absentTeacher: r.AbsentTeacherID || r['Absent Teacher'] || '',
+        reliefTeacher: r.ReliefTeacherID || r['Relief Teacher'] || '',
         note: r.Note || '', reason: r.Reason || ''
       }
     }));

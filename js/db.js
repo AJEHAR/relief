@@ -56,10 +56,12 @@ export async function getCustomSlots() {
   return _customSlotsCache;
 }
 export async function saveCustomSlots(slots) {
-  await setDoc(doc(dbFs, 'settings', 'customSlots'), { slots });
-  _customSlotsCache = slots;
-  ssSet('customSlots', slots);
-  return { success: true };
+  try {
+    await setDoc(doc(dbFs, 'settings', 'customSlots'), { slots });
+    _customSlotsCache = slots;
+    ssSet('customSlots', slots);
+    return { success: true };
+  } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
 // teachers & masterTimetable disimpan sebagai SATU dokumen besar
@@ -121,12 +123,19 @@ export async function getClassList() {
 }
 
 // ── Daily Board ──
+
+/** Bina hasil "board" penuh dari input yang DAH DIKETAHUI (tiada bacaan dailyBoard
+ * lagi) — guna lepas simpan, elak baca-semula yang tak perlu. */
+async function buildBoardResult(dateStr, absentIds, assignments, absentReasons, status, exists) {
+  const [teachers, master, customSlots] = await Promise.all([getTeacherList(), getMasterRows(), getCustomSlots()]);
+  const boardData = buildBoardData(master, teachers, dateStr, absentIds, assignments, absentReasons, customSlots);
+  return { success: true, exists, date: dateStr, absentIds, assignments, absentReasons, status, ...boardData };
+}
+
 export async function getDailyBoard(dateStr) {
-  const ref = doc(dbFs, 'dailyBoard', dateStr);
-  const snap = await getDoc(ref);
-  const teachers = await getTeacherList();
-  const master = await getMasterRows();
-  const customSlots = await getCustomSlots();
+  const [snap, teachers, master, customSlots] = await Promise.all([
+    getDoc(doc(dbFs, 'dailyBoard', dateStr)), getTeacherList(), getMasterRows(), getCustomSlots()
+  ]);
 
   let absentIds = [], assignments = {}, absentReasons = {}, status = 'draft', exists = false;
   if (snap.exists()) {
@@ -168,7 +177,7 @@ export async function addAbsentTeacher(payload) {
     ids.push(payload.teacherId);
     const absentReasons = { ...board.absentReasons, [payload.teacherId]: reason };
     await saveDailyBoard({ date: payload.date, absentIds: ids, assignments: board.assignments, absentReasons, status: 'draft' });
-    return { success: true, ...(await getDailyBoard(payload.date)) };
+    return await buildBoardResult(payload.date, ids, board.assignments, absentReasons, 'draft', true);
   } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
@@ -181,7 +190,7 @@ export async function removeAbsentTeacher(payload) {
     const absentReasons = { ...board.absentReasons };
     delete absentReasons[payload.teacherId];
     await saveDailyBoard({ date: payload.date, absentIds: ids, assignments, absentReasons, status: 'draft' });
-    return { success: true, ...(await getDailyBoard(payload.date)) };
+    return await buildBoardResult(payload.date, ids, assignments, absentReasons, 'draft', true);
   } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
@@ -193,7 +202,7 @@ export async function updateAbsentReason(payload) {
     if (!(board.absentIds || []).includes(payload.teacherId)) return { success: false, message: 'Guru ini tiada dalam rekod keberadaan.' };
     const absentReasons = { ...board.absentReasons, [payload.teacherId]: reason };
     await saveDailyBoard({ date: payload.date, absentIds: board.absentIds, assignments: board.assignments, absentReasons, status: 'draft' });
-    return { success: true, ...(await getDailyBoard(payload.date)) };
+    return await buildBoardResult(payload.date, board.absentIds, board.assignments, absentReasons, 'draft', true);
   } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
@@ -202,14 +211,17 @@ export async function updateAssignment(payload) {
     const board = await getDailyBoard(payload.date);
     const assignments = { ...board.assignments };
     const reliefTeacher = payload.reliefTeacher || '';
+    const reliefTeacherId = payload.reliefTeacherId || '';
     const note = payload.note || '';
     if (reliefTeacher || note) {
-      assignments[payload.assignKey] = { relief: reliefTeacher, note };
+      // reliefId disimpan bersama nama — padanan tugasan ni jadi stabil walau
+      // nama guru berkenaan ditukar/disunting kemudian (lihat board-engine.js).
+      assignments[payload.assignKey] = { relief: reliefTeacher, note, reliefId: reliefTeacherId };
     } else {
       delete assignments[payload.assignKey];
     }
     await saveDailyBoard({ date: payload.date, absentIds: board.absentIds, assignments, absentReasons: board.absentReasons, status: 'draft' });
-    return { success: true, ...(await getDailyBoard(payload.date)) };
+    return await buildBoardResult(payload.date, board.absentIds, assignments, board.absentReasons, 'draft', true);
   } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
@@ -217,6 +229,7 @@ export async function confirmDailyBoard(payload) {
   try {
     const board = await getDailyBoard(payload.date);
     await saveDailyBoard({ date: payload.date, absentIds: board.absentIds, assignments: board.assignments, absentReasons: board.absentReasons, status: 'confirmed' });
+    delete _guruPageCache[payload.date]; // elak paparan guru terlepas status disahkan
 
     // Padam rekod arkib lama utk tarikh ni, tulis semula
     const q = query(collection(dbFs, 'reliefRecords'), where('date', '==', payload.date));
@@ -231,19 +244,23 @@ export async function confirmDailyBoard(payload) {
     const rows = [];
 
     Object.entries(board.assignments || {}).forEach(([key, val]) => {
-      const { relief: reliefTeacher, note } = getReliefFromAssignment(val);
+      const { relief: reliefTeacher, note, reliefId } = getReliefFromAssignment(val);
       if (!reliefTeacher) return;
-      const [teacherId, periodId, className] = key.split('|');
+      // NOTA (fix): className boleh (jarang) mengandungi '|' — guna slice(2) &
+      // gabung semula, bukan destructure 3-bahagian tegar (yg akan potong
+      // className secara senyap kalau ia ada '|').
+      const parts = key.split('|');
+      const teacherId = parts[0], periodId = parts[1], className = parts.slice(2).join('|');
       const slotArr = (board.teacherMap && board.teacherMap[teacherId] && board.teacherMap[teacherId][periodId]) || [];
       const slot = slotArr.find(s => s.className === className) || slotArr[0];
       if (!slot) return;
       const period = (board.periods || []).find(p => p.id === periodId) || {};
-      const time = period.start && period.end ? `${period.start} - ${period.end}` : '';
+      const time = period.start && period.end ? `${period.start} \u2013 ${period.end}` : '';
       const reason = (board.absentReasons || {})[teacherId] || '';
       rows.push({
         batchId, date: payload.date, day: dayName, period: periodId, time,
         className, subject: slot.subject, absentTeacher: slot.teacherName,
-        reliefTeacher, timestamp: serverTimestamp(), note, reason
+        reliefTeacher, reliefTeacherId: reliefId || '', timestamp: serverTimestamp(), note, reason
       });
     });
 
@@ -343,13 +360,41 @@ export async function saveLogo(base64Data) {
   } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
+// ── Jenama (nama sistem, subtajuk, footer) ──
+const DEFAULT_BRANDING = { title: 'SISTEM GURU GANTI', subtitle: 'K-SpeEdS', footerText: 'Sistem Guru Ganti · Hak Cipta Terpelihara' };
+let _brandingCache = null;
+export async function getBranding() {
+  if (_brandingCache) return _brandingCache;
+  const cached = ssGet('branding');
+  if (cached) { _brandingCache = cached; return cached; }
+  const snap = await getDoc(doc(dbFs, 'settings', 'branding'));
+  _brandingCache = snap.exists() ? { ...DEFAULT_BRANDING, ...snap.data() } : DEFAULT_BRANDING;
+  ssSet('branding', _brandingCache);
+  return _brandingCache;
+}
+export async function saveBranding(branding) {
+  try {
+    await setDoc(doc(dbFs, 'settings', 'branding'), branding);
+    _brandingCache = { ...DEFAULT_BRANDING, ...branding };
+    ssSet('branding', _brandingCache);
+    return { success: true };
+  } catch (e) { return { success: false, message: e.message || String(e) }; }
+}
+
 // ── Guru page (Saya / Kelas / Induk) ──
+// Cache ringkas (15s) — elak bacaan berganda bila >1 bahagian page sama
+// minta data tarikh sama serentak (cth: nav.js checkTodayDuty() + page load).
+const _guruPageCache = {};
+const GURU_PAGE_TTL_MS = 15000;
+
 export async function getGuruPageData(dateStr) {
-  const teachers = await getTeacherList();
-  const classList = await getClassList();
-  const master = await getMasterRows();
-  const customSlots = await getCustomSlots();
-  const snap = await getDoc(doc(dbFs, 'dailyBoard', dateStr));
+  const cached = _guruPageCache[dateStr];
+  if (cached && Date.now() - cached.t < GURU_PAGE_TTL_MS) return cached.data;
+
+  const [teachers, master, customSlots, snap] = await Promise.all([
+    getTeacherList(), getMasterRows(), getCustomSlots(), getDoc(doc(dbFs, 'dailyBoard', dateStr))
+  ]);
+  const classList = [...new Set(master.map(r => r.className).filter(Boolean))].sort();
 
   let absentIds = [], assignments = {}, absentReasons = {}, status = 'draft';
   if (snap.exists()) {
@@ -360,7 +405,9 @@ export async function getGuruPageData(dateStr) {
 
   const boardData = buildBoardDataLight(master, dateStr, absentIds, assignments, absentReasons, customSlots);
   const board = { ...boardData, success: true, published: status === 'confirmed', status, date: dateStr, absentReasons };
-  return { success: true, teachers, classList, board };
+  const result = { success: true, teachers, classList, board };
+  _guruPageCache[dateStr] = { t: Date.now(), data: result };
+  return result;
 }
 
 // ── Pengurusan Pengguna (Admin) ──
@@ -369,10 +416,16 @@ export async function listUsers() {
   return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
 }
 export async function setUserRole(uid, role) {
-  await updateDoc(doc(dbFs, 'users', uid), { role });
+  try {
+    await updateDoc(doc(dbFs, 'users', uid), { role });
+    return { success: true };
+  } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 export async function deleteUserProfile(uid) {
-  await deleteDoc(doc(dbFs, 'users', uid));
+  try {
+    await deleteDoc(doc(dbFs, 'users', uid));
+    return { success: true };
+  } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
 // ── Reset Data (fasa testing) ──

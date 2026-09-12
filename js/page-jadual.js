@@ -2,7 +2,7 @@ import { initNav, gatePage } from './nav.js';
 import { onAuthChange, isLoggedIn } from './auth.js';
 import * as db from './db.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, todayStr, loadingCard, setBanner, toast } from './ui-utils.js';
+import { $, esc, todayStr, setBanner, toast, skeletonGroupedList, skeletonTable } from './ui-utils.js';
 
 initNav();
 
@@ -10,7 +10,7 @@ let guruBoard = null;
 
 function getDate() { return $('datePicker').value; }
 
-function printInduk() {
+async function printInduk() {
   if (!guruBoard) return;
   const win = openPrintWindow();
   const rd = guruBoard.reliefDuties || {};
@@ -25,11 +25,12 @@ function printInduk() {
   const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(guruBoard.dayName || '')}</div>
     <div class="pdf-sub">${esc(getDate())}${!guruBoard.published ? ' · (Draf, belum disahkan)' : ''}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Tidak Hadir</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  writePrintWindow(win, html, `Jadual Guru Ganti ${getDate()}`);
+  await writePrintWindow(win, html, `Jadual Guru Ganti ${getDate()}`);
 }
 
 async function loadInduk() {
-  $('induk-content').innerHTML = loadingCard();
+  const isDesktop = window.matchMedia('(min-width:900px)').matches;
+  $('induk-content').innerHTML = isDesktop ? skeletonTable(6) : skeletonGroupedList(2, 3);
   try {
     const res = await db.getGuruPageData(getDate());
     guruBoard = res.board;
@@ -113,7 +114,9 @@ function renderInduk() {
     h += `<div class="grp-card"><div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
       <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
     g.slots.forEach(d => {
-      const [tStart, tEnd] = String(d.time || '').split(' - ');
+      // NOTA: board-engine.js simpan "time" guna en-dash (–), bukan hyphen (-) —
+      // split guna regex supaya kedua-dua bentuk (& variasi spacing) disokong.
+      const [tStart, tEnd] = String(d.time || '').split(/\s*[-\u2013]\s*/);
       h += `<div class="grow">
         <div class="gnum-col"><div class="gnum">${esc(d.period)}</div><div class="gtime">${esc(tStart || '')}<br>${esc(tEnd || '')}</div></div>
         <div style="flex:1;min-width:0;">

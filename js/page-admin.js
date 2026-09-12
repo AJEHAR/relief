@@ -2,7 +2,7 @@ import { initNav, gatePage, initialSub } from './nav.js';
 import { authState } from './auth.js';
 import * as db from './db.js';
 import { processASCXML } from './xml-import.js';
-import { $, esc, escJs, toast, showConfirm } from './ui-utils.js';
+import { $, esc, toast, showConfirm, skeletonRows } from './ui-utils.js';
 
 initNav();
 
@@ -10,7 +10,7 @@ let pendingLogoBase64 = undefined;
 
 function switchSub(sub) {
   ['xml', 'logo', 'pengguna', 'reset'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
-  if (sub === 'logo') loadAdminLogoPreview();
+  if (sub === 'logo') { loadAdminLogoPreview(); loadBrandingForm(); }
   if (sub === 'pengguna') loadUserMgmt();
 }
 
@@ -66,10 +66,27 @@ function removeLogoAction() {
   });
 }
 
+// ── Jenama (tajuk/subtajuk/footer) ──
+async function loadBrandingForm() {
+  const b = await db.getBranding();
+  $('brand-title').value = b.title;
+  $('brand-subtitle').value = b.subtitle;
+  $('brand-footer').value = b.footerText;
+}
+async function saveBrandingAction() {
+  const title = $('brand-title').value.trim() || 'SISTEM GURU GANTI';
+  const subtitle = $('brand-subtitle').value.trim() || 'K-SpeEdS';
+  const footerText = $('brand-footer').value.trim() || 'Sistem Guru Ganti · Hak Cipta Terpelihara';
+  const res = await db.saveBranding({ title, subtitle, footerText });
+  if (!res.success) { $('branding-msg').innerHTML = `<span style="color:var(--danger);">Ralat: ${esc(res.message)}</span>`; return; }
+  $('branding-msg').innerHTML = `<span style="color:var(--success);">✅ Disimpan. Refresh halaman untuk lihat perubahan di navbar.</span>`;
+  toast('Jenama disimpan.', 'success');
+}
+
 // ── Pengurusan Pengguna ──
 async function loadUserMgmt() {
   const wrap = $('user-mgmt-list');
-  wrap.innerHTML = 'Memuatkan...';
+  wrap.innerHTML = skeletonRows(3);
   const users = await db.listUsers();
   if (!users.length) { wrap.innerHTML = `<div style="color:var(--muted);font-size:.8rem;">Tiada pengguna log masuk lagi.</div>`; return; }
   users.sort((a, b) => (a.role === 'pending' ? -1 : 1) - (b.role === 'pending' ? -1 : 1));
@@ -77,17 +94,21 @@ async function loadUserMgmt() {
     <img src="${esc(u.photoURL || '')}" onerror="this.style.visibility='hidden'">
     <div class="u-meta"><div style="font-weight:700;font-size:.82rem;">${esc(u.name || u.email)}</div><div class="u-email">${esc(u.email)}</div></div>
     <select data-uid="${esc(u.uid)}" class="role-select">
-      <option value="pending" ${u.role === 'pending' ? 'selected' : ''}>Belum Disahkan</option>
-      <option value="guru" ${u.role === 'guru' ? 'selected' : ''}>Guru</option>
+      <option value="pending" ${u.role !== 'admin' ? 'selected' : ''}>Guru / Belum Disahkan</option>
       <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
     </select>
+    <!-- NOTA (fix): pilihan "Guru" yang berasingan dibuang — sistem sebenarnya
+         cuma bezakan admin vs bukan-admin (lihat auth.js isAdmin()), jadi
+         "Belum Disahkan" vs "Guru" TIDAK memberi kesan akses langsung. Label
+         digabung supaya admin tak tersalah anggap dia dah "sahkan" seseorang. -->
     <button class="btn-ghost btn-sm btn-del-user" data-uid="${esc(u.uid)}" data-name="${esc(u.name || u.email)}" style="color:#dc2626;margin-left:6px;" title="Padam profil pengguna ini"><i class="fas fa-trash"></i></button>
     </div>`).join('');
   wrap.querySelectorAll('.role-select').forEach(sel => sel.addEventListener('change', () => setUserRoleAction(sel.dataset.uid, sel.value)));
   wrap.querySelectorAll('.btn-del-user').forEach(btn => btn.addEventListener('click', () => deleteUserAction(btn.dataset.uid, btn.dataset.name)));
 }
 async function setUserRoleAction(uid, role) {
-  await db.setUserRole(uid, role);
+  const res = await db.setUserRole(uid, role);
+  if (!res.success) return toast('Gagal kemas kini role: ' + res.message, 'error');
   toast('Role dikemaskini.', 'success');
   if (uid === authState.user?.uid) location.reload();
 }
@@ -97,7 +118,8 @@ function deleteUserAction(uid, name) {
     msg: `Padam profil "${name}" dari sistem? Ini cuma buang rekod role/pautan guru dalam sistem ni — akaun Google dia sendiri TIDAK dipadam. Dia boleh log masuk semula lepas ni (akan mula semula sebagai "Belum Disahkan").`,
     okLabel: 'Padam', okType: 'warn',
     onOk: async () => {
-      await db.deleteUserProfile(uid);
+      const res = await db.deleteUserProfile(uid);
+      if (!res.success) return toast('Gagal padam: ' + res.message, 'error');
       toast('Profil dipadam.', 'success');
       if (uid === authState.user?.uid) location.reload();
       else loadUserMgmt();
@@ -147,6 +169,7 @@ gatePage('admin', async () => {
   $('logoFileInput').addEventListener('change', previewLogo);
   $('btn-save-logo').addEventListener('click', saveLogoAction);
   $('btn-remove-logo').addEventListener('click', removeLogoAction);
+  $('btn-save-branding').addEventListener('click', saveBrandingAction);
   wireResetButtons();
   switchSub(initialSub('xml'));
   window.addEventListener('hashchange', () => switchSub(initialSub('xml')));

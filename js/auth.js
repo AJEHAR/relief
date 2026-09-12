@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 import {
   auth, dbFs, googleProvider, signInWithPopup, fbSignOut, onAuthStateChanged,
-  doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp
+  doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection, getDocs
 } from './firebase-init.js';
 import { BOOTSTRAP_ADMIN_EMAILS } from './firebase-config.js';
 
@@ -56,20 +56,44 @@ async function ensureUserProfile(user) {
   return profile;
 }
 
-export async function setMyTeacherId(teacherId) {
-  if (!authState.user) return;
-  const ref = doc(dbFs, 'users', authState.user.uid);
-  await updateDoc(ref, { teacherId });
-  authState.profile = { ...authState.profile, teacherId };
-  notify();
+/**
+ * NOTA (fix keselamatan): dulu fungsi ni terus tetapkan teacherId tanpa apa-apa
+ * semakan — mana-mana akaun Google (termasuk "Belum Disahkan") boleh claim
+ * identiti MANA-MANA guru, walaupun dah diclaim akaun lain (isu impersonation).
+ * Sekarang disemak dulu: kalau teacherId ni dah terikat pada akaun LAIN,
+ * pulangkan { success:false, clash:true } supaya UI boleh amaran/minta
+ * pengesahan pengguna dahulu (lulus { force:true } utk timpa selepas makluman).
+ */
+export async function setMyTeacherId(teacherId, { force = false } = {}) {
+  if (!authState.user) return { success: false, message: 'Belum log masuk.' };
+  try {
+    if (!force) {
+      const snap = await getDocs(collection(dbFs, 'users'));
+      const clash = snap.docs.find(d => d.id !== authState.user.uid && d.data().teacherId === teacherId);
+      if (clash) {
+        return {
+          success: false, clash: true,
+          message: `Nama guru ini sudah dipautkan ke akaun lain (${clash.data().email || clash.data().name || 'tidak diketahui'}).`
+        };
+      }
+    }
+    const ref = doc(dbFs, 'users', authState.user.uid);
+    await updateDoc(ref, { teacherId });
+    authState.profile = { ...authState.profile, teacherId };
+    notify();
+    return { success: true };
+  } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
 /** Padam profil/role sendiri dari sistem (bukan padam akaun Google) + log keluar. */
 export async function deleteMyProfile() {
-  if (!authState.user) return;
-  const uid = authState.user.uid;
-  await deleteDoc(doc(dbFs, 'users', uid));
-  await fbSignOut(auth);
+  if (!authState.user) return { success: false, message: 'Belum log masuk.' };
+  try {
+    const uid = authState.user.uid;
+    await deleteDoc(doc(dbFs, 'users', uid));
+    await fbSignOut(auth);
+    return { success: true };
+  } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
 
 export function isAdmin() {

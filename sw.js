@@ -5,7 +5,12 @@ const CACHE_NAME = 'relief-v2';
 const STATIC_ASSETS = [
   '/', '/index.html', '/ruang-guru.html', '/penyelaras.html', '/admin.html', '/migrate.html',
   '/manifest.json', '/icon-192.png', '/icon-512.png',
-  '/css/style.css', '/css/relief-extra.css'
+  '/css/style.css', '/css/relief-extra.css',
+  // Fail JS (dulu tertinggal dari precache — offline first-visit tak lengkap) —
+  '/js/nav.js', '/js/ui-utils.js', '/js/shared-data.js', '/js/auth.js', '/js/db.js',
+  '/js/board-engine.js', '/js/xml-import.js', '/js/pdf-export.js',
+  '/js/firebase-init.js', '/js/firebase-config.js',
+  '/js/page-jadual.js', '/js/page-ruang-guru.js', '/js/page-penyelaras.js', '/js/page-admin.js'
 ];
 
 // JANGAN cache Firebase / Google / CDN — data hidup & SDK mesti sentiasa terkini
