@@ -187,6 +187,19 @@
 .l-name{font-weight:800;font-size:.85rem;color:#111827;margin-top:3px;}
 .grow-note{margin-top:4px;font-size:.66rem;color:#92400e;background:#fffbeb;border-radius:6px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px;}
 
+/* ═══════════════════════════════════════════════════
+   GRID JADUAL INDUK — kotak dikecilkan + bucu bulat
+   ═══════════════════════════════════════════════════ */
+.tt-slot{height:50px;}
+.tt-slot-inner{margin:3px;border-radius:9px;padding:4px 6px;}
+.tt-slot:not(.s-empty):not(.s-rehat) .tt-slot-inner{box-shadow:0 4px 10px rgba(0,0,0,0.32),0 1px 2px rgba(0,0,0,0.25);transform:translateY(-1px);}
+.tt-head-period{min-width:62px;width:62px;}
+.tt-head-rehat{min-width:42px;width:42px;}
+.tt-guru-cell{min-width:96px;width:96px;padding:7px 8px;}
+.tt-head-guru{min-width:96px;width:96px;}
+.tt-slot-subj{font-size:.58rem;}
+.tt-slot-class{font-size:.52rem;}
+
 /* Desktop = jadual 7-lajur asal; Mobile/tablet = grouping baru */
 .desktop-table-view{display:none;}
 .mobile-grouped-view{display:block;}
