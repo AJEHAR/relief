@@ -502,6 +502,59 @@ async function printArchive() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// LAPORAN MENGIKUT TEMPOH (julat tarikh / tahun)
+// ═══════════════════════════════════════════════════════════
+function populateYearSelect() {
+  const sel = $('range-year-select');
+  const thisYear = new Date().getFullYear();
+  const years = [thisYear, thisYear - 1, thisYear - 2, thisYear - 3];
+  sel.innerHTML = '<option value="">— Pilih Tahun (pantas) —</option>' + years.map(y => `<option value="${y}">Tahun ${y}</option>`).join('');
+  sel.addEventListener('change', () => {
+    if (!sel.value) return;
+    $('range-start').value = `${sel.value}-01-01`;
+    $('range-end').value = `${sel.value}-12-31`;
+  });
+}
+
+async function generateRangeReport() {
+  const start = $('range-start').value, end = $('range-end').value;
+  if (!start || !end) return toast('Sila pilih tarikh Dari & Hingga (atau pilih Tahun).', 'error');
+  if (start > end) return toast('Tarikh "Dari" mesti sebelum "Hingga".', 'error');
+
+  const win = openPrintWindow();
+  $('range-report-msg').innerHTML = `<span style="color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Menjana laporan...</span>`;
+  try {
+    const records = await db.getReliefByDateRange(start, end);
+    if (!records.length) {
+      win.close();
+      $('range-report-msg').innerHTML = `<span style="color:var(--danger);">Tiada rekod dalam tempoh ini.</span>`;
+      return;
+    }
+
+    // Kumpulkan ikut tarikh
+    const byDate = {};
+    records.forEach(r => { if (!byDate[r.date]) byDate[r.date] = []; byDate[r.date].push(r); });
+    const dates = Object.keys(byDate).sort();
+
+    let body = '';
+    dates.forEach(dateStr => {
+      const dayRecords = byDate[dateStr];
+      const dayName = dayRecords[0]?.day || '';
+      body += `<div style="font-weight:800;font-size:11pt;color:#0f2044;margin:14pt 0 4pt;padding-top:8pt;border-top:1px solid #e2e8f0;">${esc(dateStr)} · ${esc(dayName)} <span style="font-weight:400;color:#6b7c9e;">(${dayRecords.length} tugasan)</span></div>`;
+      const rows = dayRecords.map(r => `<tr><td>${esc(r.period)}</td><td>${esc(r.time)}</td><td>${esc(r.className)}</td><td>${esc(r.subject)}</td><td>${esc(r.absentTeacher)}</td><td class="green">${esc(r.reliefTeacher)}</td><td>${esc(r.note) || ''}</td></tr>`).join('');
+      body += `<table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
+    });
+
+    const html = `<div class="pdf-title">Laporan Guru Ganti</div>
+      <div class="pdf-sub">${esc(start)} hingga ${esc(end)} · ${records.length} tugasan merentas ${dates.length} hari</div>
+      ${body}`;
+    writePrintWindow(win, html, `Laporan_Guru_Ganti_${start}_${end}`);
+    $('range-report-msg').innerHTML = `<span style="color:var(--success);">✅ Laporan dijana (${records.length} tugasan, ${dates.length} hari).</span>`;
+  } catch (e) {
+    win.close();
+    $('range-report-msg').innerHTML = `<span style="color:var(--danger);">Ralat: ${esc(e.message)}</span>`;
+  }
+}
 // MASA JADUAL (Rehat & Slot Tersuai)
 // ═══════════════════════════════════════════════════════════
 const ALL_DAYS = ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat'];
@@ -624,6 +677,8 @@ gatePage('admin', async () => {
   $('btn-confirm-board').addEventListener('click', confirmBoard);
   $('btn-add-extra').addEventListener('click', addExtraTeacherAction);
   $('btn-print-archive').addEventListener('click', printArchive);
+  $('btn-gen-range-report').addEventListener('click', generateRangeReport);
+  populateYearSelect();
   $('btn-close-assign').addEventListener('click', closeAssignModal);
   $('btn-clear-assign').addEventListener('click', clearAssignment);
   $('btn-save-note').addEventListener('click', saveNoteOnly);

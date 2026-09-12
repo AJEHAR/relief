@@ -11,12 +11,36 @@ import { buildBoardData, buildBoardDataLight, getReliefFromAssignment, getMalayD
 const ABSENT_REASONS = ['Urusan Rasmi', 'Cuti', 'Keluar Waktu Bekerja'];
 export { ABSENT_REASONS };
 
-// ── Cache ringkas dalam memori (elak baca Firestore berulang) ──
+// ── Cache — dalam memori (per page) + sessionStorage (merentas navigasi page
+// dalam tab sama, elak baca Firestore berulang bila tukar Jadual Ganti ↔
+// Ruang Guru ↔ Penyelaras dll — setiap page load ialah reload penuh) ──
+const SS_PREFIX = 'rgcache:';
+const SS_TTL_MS = 5 * 60 * 1000; // 5 minit — cukup lama utk navigasi, cukup pendek elak data lapuk
+
+function ssGet(key) {
+  try {
+    const raw = sessionStorage.getItem(SS_PREFIX + key);
+    if (!raw) return undefined;
+    const { t, v } = JSON.parse(raw);
+    if (Date.now() - t > SS_TTL_MS) { sessionStorage.removeItem(SS_PREFIX + key); return undefined; }
+    return v;
+  } catch (e) { return undefined; }
+}
+function ssSet(key, v) {
+  try { sessionStorage.setItem(SS_PREFIX + key, JSON.stringify({ t: Date.now(), v })); } catch (e) {}
+}
+function ssClear(key) {
+  try { sessionStorage.removeItem(SS_PREFIX + key); } catch (e) {}
+}
+
 let _teachersCache = null;
 let _masterCache = null;
 let _customSlotsCache = null;
 
-export function invalidateCache() { _teachersCache = null; _masterCache = null; _customSlotsCache = null; }
+export function invalidateCache() {
+  _teachersCache = null; _masterCache = null; _customSlotsCache = null;
+  ssClear('teachers'); ssClear('master'); ssClear('customSlots');
+}
 
 const DEFAULT_CUSTOM_SLOTS = [
   { id: 'REHAT_DEFAULT', label: 'Rehat', start: '10.10am', end: '10.30am', days: ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat'] }
@@ -24,30 +48,70 @@ const DEFAULT_CUSTOM_SLOTS = [
 
 export async function getCustomSlots() {
   if (_customSlotsCache) return _customSlotsCache;
+  const cached = ssGet('customSlots');
+  if (cached) { _customSlotsCache = cached; return cached; }
   const snap = await getDoc(doc(dbFs, 'settings', 'customSlots'));
   _customSlotsCache = snap.exists() && Array.isArray(snap.data().slots) ? snap.data().slots : DEFAULT_CUSTOM_SLOTS;
+  ssSet('customSlots', _customSlotsCache);
   return _customSlotsCache;
 }
 export async function saveCustomSlots(slots) {
   await setDoc(doc(dbFs, 'settings', 'customSlots'), { slots });
   _customSlotsCache = slots;
+  ssSet('customSlots', slots);
   return { success: true };
 }
 
+// teachers & masterTimetable disimpan sebagai SATU dokumen besar
+// (bukan 1 dokumen per baris) — elak kuota "reads" percuma cepat habis.
+// teachers & masterTimetable disimpan sebagai SATU dokumen besar
+// (bukan 1 dokumen per baris) — elak kuota "reads" percuma cepat habis.
+// Kedua-dua fungsi di bawah AUTO-MIGRATE dari struktur lama (banyak
+// dokumen) secara senyap kali pertama dipanggil selepas deploy — tiada
+// data hilang (termasuk Guru Tambahan), tiada perlu upload XML semula.
 export async function getTeacherList() {
   if (_teachersCache) return _teachersCache;
-  const snap = await getDocs(collection(dbFs, 'teachers'));
-  const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .filter(t => t.id && t.name);
+  const cached = ssGet('teachers');
+  if (cached) { _teachersCache = cached; return cached; }
+  const snap = await getDoc(doc(dbFs, 'teachers', 'data'));
+  if (snap.exists()) {
+    const list = (snap.data().list || []).filter(t => t.id && t.name);
+    _teachersCache = list; ssSet('teachers', list);
+    return list;
+  }
+  // ── Auto-migrasi: struktur baru belum wujud, cuba struktur lama ──
+  const oldSnap = await getDocs(collection(dbFs, 'teachers'));
+  const oldList = oldSnap.docs.filter(d => d.id !== 'data').map(d => ({ id: d.id, ...d.data() })).filter(t => t.id && t.name);
+  if (oldList.length > 0) {
+    try { await setDoc(doc(dbFs, 'teachers', 'data'), { list: oldList }); } catch (e) { /* mungkin bukan admin, biar admin migrate nanti */ }
+  }
+  _teachersCache = oldList; ssSet('teachers', oldList);
+  return oldList;
+}
+async function saveTeacherList(list) {
+  await setDoc(doc(dbFs, 'teachers', 'data'), { list });
   _teachersCache = list;
-  return list;
+  ssSet('teachers', list);
 }
 
 async function getMasterRows() {
   if (_masterCache) return _masterCache;
-  const snap = await getDocs(collection(dbFs, 'masterTimetable'));
-  _masterCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  return _masterCache;
+  const cached = ssGet('master');
+  if (cached) { _masterCache = cached; return cached; }
+  const snap = await getDoc(doc(dbFs, 'masterTimetable', 'data'));
+  if (snap.exists()) {
+    _masterCache = snap.data().rows || [];
+    ssSet('master', _masterCache);
+    return _masterCache;
+  }
+  // ── Auto-migrasi: struktur baru belum wujud, cuba struktur lama ──
+  const oldSnap = await getDocs(collection(dbFs, 'masterTimetable'));
+  const oldRows = oldSnap.docs.filter(d => d.id !== 'data').map(d => d.data());
+  if (oldRows.length > 0) {
+    try { await setDoc(doc(dbFs, 'masterTimetable', 'data'), { rows: oldRows }); } catch (e) { /* bukan admin, biar admin migrate nanti */ }
+  }
+  _masterCache = oldRows; ssSet('master', oldRows);
+  return oldRows;
 }
 
 export async function getClassList() {
@@ -211,6 +275,27 @@ export async function getReliefByDate(dateStr) {
   });
 }
 
+/** Ambil rekod arkib merentas julat tarikh (inklusif) — utk Laporan Mengikut Tempoh. */
+export async function getReliefByDateRange(startDate, endDate) {
+  const q = query(collection(dbFs, 'reliefRecords'), where('date', '>=', startDate), where('date', '<=', endDate));
+  const snap = await getDocs(q);
+  const rows = snap.docs.map(d => {
+    const row = d.data();
+    return {
+      date: row.date, day: row.day || '', period: row.period, time: row.time,
+      className: row.className, subject: row.subject,
+      absentTeacher: row.absentTeacher, reliefTeacher: row.reliefTeacher,
+      note: row.note || '', reason: row.reason || ''
+    };
+  });
+  rows.sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
+    return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
+  });
+  return rows;
+}
+
 // ── Guru tambahan ──
 export async function getExtraTeachers() {
   const teachers = await getTeacherList();
@@ -227,8 +312,8 @@ export async function addExtraTeacher(payload) {
       return { success: false, message: 'Nama guru ini sudah wujud dalam senarai.' };
     }
     const id = 'EXTRA_' + Date.now();
-    await setDoc(doc(dbFs, 'teachers', id), { name, short, contact: '', email: '' });
-    invalidateCache();
+    const newList = [...teachers, { id, name, short, contact: '', email: '' }];
+    await saveTeacherList(newList);
     return { success: true, message: 'Guru berjaya ditambah.', id };
   } catch (e) { return { success: false, message: e.message || String(e) }; }
 }
@@ -236,8 +321,9 @@ export async function addExtraTeacher(payload) {
 export async function deleteExtraTeacher(id) {
   try {
     if (!String(id).startsWith('EXTRA_')) return { success: false, message: 'Hanya guru tambahan boleh dipadam di sini.' };
-    await deleteDoc(doc(dbFs, 'teachers', id));
-    invalidateCache();
+    const teachers = await getTeacherList();
+    const newList = teachers.filter(t => t.id !== id);
+    await saveTeacherList(newList);
     return { success: true };
   } catch (e) { return { success: false, message: e.message || String(e) }; }
 }

@@ -1,4 +1,4 @@
-import { auth, dbFs, googleProvider, signInWithPopup, onAuthStateChanged, doc, getDoc, collection, getDocs, writeBatch } from './firebase-init.js';
+import { auth, dbFs, googleProvider, signInWithPopup, onAuthStateChanged, doc, getDoc, setDoc, collection, getDocs, writeBatch } from './firebase-init.js';
 
 const logEl = document.getElementById('log');
 function log(msg) { logEl.textContent += '\n' + msg; logEl.scrollTop = logEl.scrollHeight; }
@@ -75,14 +75,13 @@ window.importTeachers = async function () {
   try {
     log('▶ Membaca Teachers.csv...');
     const rows = parseCSV(await readFile('f-teachers'));
-    log(`  ${rows.length} baris dijumpai. Membersihkan koleksi lama...`);
-    await clearCollection('teachers');
-    const items = rows.filter(r => r.ID && r.Name).map(r => ({
-      id: String(r.ID).trim(),
-      data: { name: String(r.Name).trim(), short: String(r.Short || '').trim(), contact: String(r.Contact || ''), email: String(r.Email || '') }
+    const list = rows.filter(r => r.ID && r.Name).map(r => ({
+      id: String(r.ID).trim(), name: String(r.Name).trim(), short: String(r.Short || '').trim(),
+      contact: String(r.Contact || ''), email: String(r.Email || '')
     }));
-    await writeDocs('teachers', items);
-    log(`✅ ${items.length} guru berjaya diimport.`);
+    log(`  ${list.length} guru dijumpai. Menulis (1 dokumen besar — elak kuota reads)...`);
+    await setDoc(doc(dbFs, 'teachers', 'data'), { list });
+    log(`✅ ${list.length} guru berjaya diimport.`);
   } catch (e) { log('❌ Ralat: ' + e.message); }
 };
 
@@ -90,20 +89,16 @@ window.importMaster = async function () {
   try {
     log('▶ Membaca MasterTimetable.csv...');
     const rows = parseCSV(await readFile('f-master'));
-    log(`  ${rows.length} baris dijumpai. Membersihkan koleksi lama...`);
-    await clearCollection('masterTimetable');
-    const items = rows.map((r, i) => ({
-      id: 'S' + i,
-      data: {
-        day: String(r.Day || '').trim(), period: String(r.Period || '').trim(),
-        start: String(r.Start || '').trim(), end: String(r.End || '').trim(),
-        classId: String(r.ClassID || '').trim(), className: String(r.Class || '').trim(),
-        subId: String(r.SubID || '').trim(), subject: String(r.Subject || '').trim(),
-        teacherId: String(r.TeachID || '').trim(), teacherName: String(r.Teacher || '').trim()
-      }
+    const list = rows.map(r => ({
+      day: String(r.Day || '').trim(), period: String(r.Period || '').trim(),
+      start: String(r.Start || '').trim(), end: String(r.End || '').trim(),
+      classId: String(r.ClassID || '').trim(), className: String(r.Class || '').trim(),
+      subId: String(r.SubID || '').trim(), subject: String(r.Subject || '').trim(),
+      teacherId: String(r.TeachID || '').trim(), teacherName: String(r.Teacher || '').trim()
     }));
-    await writeDocs('masterTimetable', items);
-    log(`✅ ${items.length} slot jadual berjaya diimport.`);
+    log(`  ${list.length} slot dijumpai. Menulis (1 dokumen besar — elak kuota reads)...`);
+    await setDoc(doc(dbFs, 'masterTimetable', 'data'), { rows: list });
+    log(`✅ ${list.length} slot jadual berjaya diimport.`);
   } catch (e) { log('❌ Ralat: ' + e.message); }
 };
 

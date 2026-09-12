@@ -191,8 +191,10 @@
    GRID JADUAL INDUK — kotak dikecilkan + bucu bulat
    ═══════════════════════════════════════════════════ */
 .tt-slot{height:50px;}
-.tt-slot-inner{margin:3px;border-radius:9px;padding:4px 6px;}
-.tt-slot:not(.s-empty):not(.s-rehat) .tt-slot-inner{box-shadow:0 4px 10px rgba(0,0,0,0.32),0 1px 2px rgba(0,0,0,0.25);transform:translateY(-1px);}
+.tt-slot-inner{margin:3px;border-radius:9px;padding:4px 6px;height:calc(100% - 6px);}
+.tt-slot:not(.s-empty):not(.s-rehat):not(.s-override) .tt-slot-inner{box-shadow:0 4px 10px rgba(0,0,0,0.32),0 1px 2px rgba(0,0,0,0.25);transform:translateY(-1px);}
+.tt-slot.s-override{outline:none;}
+.tt-slot.s-override .tt-slot-inner{box-shadow:0 0 0 3px #ea580c,0 4px 10px rgba(0,0,0,0.32),0 1px 2px rgba(0,0,0,0.25);transform:translateY(-1px);}
 .tt-head-period{min-width:62px;width:62px;}
 .tt-head-rehat{min-width:42px;width:42px;}
 .tt-guru-cell{min-width:96px;width:96px;padding:7px 8px;}

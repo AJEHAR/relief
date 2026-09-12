@@ -1,10 +1,15 @@
 // ═══════════════════════════════════════════════════════════
 // XML IMPORT — port dari processASCXML() (Code.gs) ke client-side,
 // guna DOMParser (bukan XmlService Apps Script), tulis ke Firestore.
+//
+// NOTA PRESTASI: teachers & masterTimetable disimpan sebagai SATU
+// dokumen besar (field array), BUKAN satu dokumen per baris/guru.
+// Ini elak kuota "reads" percuma Firestore cepat habis — baca
+// seluruh jadual jadi 1 bacaan sahaja, bukan ratusan/ribuan.
 // ═══════════════════════════════════════════════════════════
-import { dbFs, doc, collection, getDocs, writeBatch } from './firebase-init.js';
+import { dbFs, doc, setDoc } from './firebase-init.js';
 import { formatTimeStr } from './board-engine.js';
-import { invalidateCache } from './db.js';
+import { invalidateCache, getTeacherList } from './db.js';
 
 function ga(el, name) {
   const v = el.getAttribute(name);
@@ -16,26 +21,6 @@ function gaAny(el, names) {
     if (v && v.trim()) return v.trim();
   }
   return '';
-}
-
-async function commitInChunks(colName, docs) {
-  for (let i = 0; i < docs.length; i += 400) {
-    const chunk = docs.slice(i, i + 400);
-    const b = writeBatch(dbFs);
-    chunk.forEach(({ id, data }) => b.set(doc(dbFs, colName, id), data));
-    await b.commit();
-  }
-}
-
-async function clearCollectionExcept(colName, keepPredicate) {
-  const snap = await getDocs(collection(dbFs, colName));
-  const toDelete = snap.docs.filter(d => !keepPredicate || !keepPredicate(d.id, d.data()));
-  for (let i = 0; i < toDelete.length; i += 400) {
-    const chunk = toDelete.slice(i, i + 400);
-    const b = writeBatch(dbFs);
-    chunk.forEach(d => b.delete(d.ref));
-    await b.commit();
-  }
 }
 
 export async function processASCXML(fileContent, onProgress) {
@@ -135,20 +120,21 @@ export async function processASCXML(fileContent, onProgress) {
       if (!hadValidDay) cNoDays++;
     });
 
-    // ── Tulis ke Firestore ──
+    // ── Tulis ke Firestore (SATU dokumen besar setiap koleksi) ──
     if (teachersArray.length > 0) {
-      onProgress && onProgress('Membersihkan senarai guru lama...');
-      await clearCollectionExcept('teachers', (id) => String(id).startsWith('EXTRA_'));
-      onProgress && onProgress(`Menulis ${teachersArray.length} guru...`);
-      await commitInChunks('teachers', teachersArray.map(t => ({ id: t.id, data: t })));
+      onProgress && onProgress('Menggabung guru tambahan sedia ada...');
+      invalidateCache(); // pastikan getTeacherList() baca fresh (elak cache lapuk/kosong)
+      const existingList = await getTeacherList(); // auto-migrate struktur lama jika perlu
+      const existingExtras = existingList.filter(t => String(t.id).startsWith('EXTRA_'));
+      const fullList = [...teachersArray, ...existingExtras];
+      onProgress && onProgress(`Menulis ${fullList.length} guru...`);
+      await setDoc(doc(dbFs, 'teachers', 'data'), { list: fullList });
       invalidateCache();
     }
 
     if (masterData.length > 0) {
-      onProgress && onProgress('Membersihkan jadual induk lama...');
-      await clearCollectionExcept('masterTimetable', null);
       onProgress && onProgress(`Menulis ${masterData.length} slot jadual...`);
-      await commitInChunks('masterTimetable', masterData.map((row, i) => ({ id: 'S' + i, data: row })));
+      await setDoc(doc(dbFs, 'masterTimetable', 'data'), { rows: masterData });
       invalidateCache();
     }
 

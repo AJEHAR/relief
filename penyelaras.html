@@ -111,11 +111,29 @@
     <div id="sub-sejarah" class="hidden fade-in">
       <div class="card">
         <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <div style="font-weight:700;color:var(--navy);">Arkib Guru Ganti</div>
+          <div style="font-weight:700;color:var(--navy);">Arkib Guru Ganti — Tarikh Semasa</div>
           <button class="btn btn-success btn-sm" id="btn-print-archive"><i class="fas fa-file-pdf"></i> Jana PDF</button>
         </div>
       </div>
       <div id="history-container"></div>
+
+      <div class="card admin-section">
+        <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#0891b2,#0e7490);"><i class="fas fa-calendar-week"></i></div>
+          <div><div class="card-head-title">Laporan Mengikut Tempoh</div><div class="card-head-sub">Jana satu PDF merangkumi julat tarikh atau setahun penuh</div></div></div>
+        <div class="card-body">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            <select id="range-year-select" class="input-field" style="flex:1;min-width:120px;"><option value="">— Pilih Tahun (pantas) —</option></select>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+            <div style="flex:1;min-width:130px;"><label style="font-size:.68rem;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Dari</label>
+              <input type="date" id="range-start" class="input-field" style="width:100%;"></div>
+            <div style="flex:1;min-width:130px;"><label style="font-size:.68rem;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Hingga</label>
+              <input type="date" id="range-end" class="input-field" style="width:100%;"></div>
+            <button class="btn btn-primary btn-sm" id="btn-gen-range-report"><i class="fas fa-file-pdf"></i> Jana Laporan PDF</button>
+          </div>
+          <div id="range-report-msg" style="margin-top:10px;font-size:.78rem;font-weight:700;"></div>
+        </div>
+      </div>
     </div>
 
     <!-- SUBPAGE: Masa Jadual -->
