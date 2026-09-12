@@ -100,7 +100,7 @@ export async function addAbsentTeacher(payload) {
     if (!ABSENT_REASONS.includes(reason)) return { success: false, message: 'Sila pilih sebab ketidakhadiran.' };
     const board = await getDailyBoard(payload.date);
     const ids = board.absentIds || [];
-    if (ids.includes(payload.teacherId)) return { success: false, message: 'Guru ini sudah ditanda tidak hadir.' };
+    if (ids.includes(payload.teacherId)) return { success: false, message: 'Keberadaan guru ini telah dikemas kini.' };
     ids.push(payload.teacherId);
     const absentReasons = { ...board.absentReasons, [payload.teacherId]: reason };
     await saveDailyBoard({ date: payload.date, absentIds: ids, assignments: board.assignments, absentReasons, status: 'draft' });
@@ -126,7 +126,7 @@ export async function updateAbsentReason(payload) {
     const reason = String(payload.reason || '').trim();
     if (!ABSENT_REASONS.includes(reason)) return { success: false, message: 'Sila pilih sebab ketidakhadiran.' };
     const board = await getDailyBoard(payload.date);
-    if (!(board.absentIds || []).includes(payload.teacherId)) return { success: false, message: 'Guru ini tiada dalam senarai tidak hadir.' };
+    if (!(board.absentIds || []).includes(payload.teacherId)) return { success: false, message: 'Guru ini tiada dalam rekod keberadaan.' };
     const absentReasons = { ...board.absentReasons, [payload.teacherId]: reason };
     await saveDailyBoard({ date: payload.date, absentIds: board.absentIds, assignments: board.assignments, absentReasons, status: 'draft' });
     return { success: true, ...(await getDailyBoard(payload.date)) };

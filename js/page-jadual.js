@@ -40,6 +40,13 @@ async function loadInduk() {
   }
 }
 
+function getInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  if (!parts[0]) return '?';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
 function renderInduk() {
   const bn = $('induk-banner'), ct = $('induk-content');
   const board = guruBoard;
@@ -51,38 +58,50 @@ function renderInduk() {
   const rd = board.reliefDuties || {};
   const all = [];
   Object.entries(rd).forEach(([rn, ds]) => ds.forEach(d => all.push({ ...d, reliefName: rn })));
-  all.sort((a, b) => {
-    const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
-    return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
-  });
 
   if (all.length === 0) {
     ct.innerHTML = `<div class="card"><div class="state-box"><div class="s-icon">📋</div><div class="s-title">Tiada Tugasan Guru Ganti</div><div class="s-sub">Tiada sebarang tugasan bagi tarikh ini.</div></div></div>`;
     return;
   }
 
+  // Kumpulkan ikut guru TIDAK HADIR
+  const byAbsent = {};
+  all.forEach(d => {
+    const key = d.absentTeacher || 'Tiada Nama';
+    if (!byAbsent[key]) byAbsent[key] = { reason: d.absentReason || '', slots: [] };
+    byAbsent[key].slots.push(d);
+  });
+  Object.values(byAbsent).forEach(g => g.slots.sort((a, b) => {
+    const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
+    return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
+  }));
+  const absentNames = Object.keys(byAbsent).sort((a, b) => a.localeCompare(b));
+
   const rCount = Object.keys(rd).length, cSet = new Set(all.map(d => d.className));
   let h = `<div class="summary-row">
       <div class="sum-chip"><div class="sum-num">${all.length}</div><div class="sum-lbl"><i class="fas fa-tasks" style="color:var(--teal);margin-right:3px;"></i>Jumlah Slot</div></div>
-      <div class="sum-chip"><div class="sum-num">${rCount}</div><div class="sum-lbl"><i class="fas fa-user-check" style="color:var(--success);margin-right:3px;"></i>Guru Bertugas</div></div>
+      <div class="sum-chip"><div class="sum-num">${rCount}</div><div class="sum-lbl"><i class="fas fa-user-check" style="color:var(--success);margin-right:3px;"></i>Guru Terlibat</div></div>
       <div class="sum-chip"><div class="sum-num">${cSet.size}</div><div class="sum-lbl"><i class="fas fa-door-open" style="color:var(--navy);margin-right:3px;"></i>Kelas Terlibat</div></div>
     </div>
     <div class="card fade-in">
       <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);"><i class="fas fa-list-alt"></i></div>
         <div><div class="card-head-title">Senarai Lengkap Guru Ganti</div><div class="card-head-sub">${esc(board.dayName || '')} · ${all.length} tugasan · ${rCount} guru</div></div></div>
-      <div class="rl-list">`;
-  all.forEach(d => {
-    h += `<div class="rl-row">
-      <div class="rl-period"><span class="rl-wkt">${esc(d.period)}</span><span class="rl-time">${esc(d.time).replace(' - ', '<br>')}</span></div>
-      <div class="rl-main">
-        <div class="rl-line1"><span class="c-pill">${esc(d.className)}</span><span class="rl-subj">${esc(d.subject) || '—'}</span></div>
-        <div class="rl-line2">
-          <i class="fas fa-check-circle" style="color:var(--success);font-size:.65rem;"></i><span class="rl-relief">${esc(d.reliefName)}</span>
-          <span class="rl-arrow">ganti</span><i class="fas fa-user-slash" style="color:var(--danger);font-size:.6rem;"></i><span class="rl-absent">${esc(d.absentTeacher) || '—'}</span>
+      <div class="grp-list">`;
+  absentNames.forEach(name => {
+    const g = byAbsent[name];
+    h += `<div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
+      <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
+    g.slots.forEach(d => {
+      h += `<div class="grow">
+        <div class="gnum">${esc(d.period)}<span>${esc((d.time || '').split(' - ')[0])}</span></div>
+        <div style="flex:1;min-width:0;">
+          <div class="l-class">${esc(d.className)}</div>
+          <div class="l-subj"><i class="fas fa-book"></i>${esc(d.subject) || '—'}</div>
+          <div class="l-name">${esc(d.reliefName)}</div>
+          ${d.note ? `<div class="grow-note"><i class="fas fa-sticky-note"></i>${esc(d.note)}</div>` : ''}
         </div>
-        ${d.note ? `<div class="rl-note"><i class="fas fa-sticky-note"></i>${esc(d.note)}</div>` : ''}
-      </div>
-    </div>`;
+      </div>`;
+    });
   });
   h += `</div></div>`;
   ct.innerHTML = h;

@@ -14,6 +14,12 @@ let overrideOn = false;
 let currentSub = 'papan';
 
 function getDate() { return $('datePicker').value; }
+function getInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  if (!parts[0]) return '?';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
 
 function switchSub(sub) {
   currentSub = sub;
@@ -65,7 +71,7 @@ function renderBoardStatus() {
 function renderAbsentPanel() {
   const wrap = $('absent-tags-container');
   const ids = currentBoard.absentIds || [];
-  if (!ids.length) { wrap.innerHTML = `<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Tiada guru ditanda tidak hadir.</div>`; return; }
+  if (!ids.length) { wrap.innerHTML = `<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Tiada rekod keberadaan buat masa ini.</div>`; return; }
   wrap.innerHTML = ids.map(id => {
     const t = teachersList.find(x => x.id === id) || { name: id };
     const reason = (currentBoard.absentReasons || {})[id] || '—';
@@ -87,13 +93,13 @@ async function addAbsent() {
   currentBoard = res;
   populateAbsentSelect(); renderAbsentPanel(); renderTimetableGrid();
   $('absent-reason-select').value = '';
-  toast('Guru ditanda tidak hadir.', 'success');
+  toast('Keberadaan guru telah dikemas kini.', 'success');
 }
 
 function removeAbsent(teacherId) {
   const t = teachersList.find(x => x.id === teacherId);
   showConfirm({
-    title: 'Buang Tanda Tidak Hadir', msg: `Buang ${t ? t.name : teacherId} dari senarai tidak hadir? Tugasan guru ganti berkaitan akan turut dipadam.`,
+    title: 'Padam Rekod Keberadaan', msg: `Padam rekod keberadaan bagi ${t ? t.name : teacherId}? Tugasan guru ganti berkaitan akan turut dipadam.`,
     okLabel: 'Buang', okType: 'warn',
     onOk: async () => {
       const res = await db.removeAbsentTeacher({ date: getDate(), teacherId });
@@ -183,7 +189,7 @@ function renderTimetableGrid() {
 
     html += `<tr><td class="tt-sticky tt-guru-cell ${isAbsent ? 'tt-guru-absent' : ''}">
       <span class="tt-guru-name">${esc(shortName)}</span>
-      ${isAbsent ? `<span class="tt-guru-tag" title="${esc(reason)}">✗ ${esc(reason) || 'Tak Hadir'}</span>` : ''}
+      ${isAbsent ? `<span class="tt-guru-tag" title="${esc(reason)}">✗ ${esc(reason) || 'Tidak Hadir'}</span>` : ''}
     </td>`;
 
     periods.forEach(p => {
@@ -426,19 +432,35 @@ async function loadHistory() {
 function renderHistory(records) {
   const ct = $('history-container');
   if (!records.length) { ct.innerHTML = `<div class="card"><div class="state-box"><div class="s-icon">🗂️</div><div class="s-title">Tiada Rekod</div><div class="s-sub">Tiada rekod guru ganti disahkan untuk tarikh ini.</div></div></div>`; return; }
-  let h = `<div class="card"><div class="rl-list">`;
+
+  const byAbsent = {};
   records.forEach(r => {
-    h += `<div class="rl-row">
-      <div class="rl-period"><span class="rl-wkt">${esc(r.period)}</span><span class="rl-time">${esc(r.time).replace(' - ', '<br>')}</span></div>
-      <div class="rl-main">
-        <div class="rl-line1"><span class="c-pill">${esc(r.className)}</span><span class="rl-subj">${esc(r.subject) || '—'}</span></div>
-        <div class="rl-line2">
-          <i class="fas fa-check-circle" style="color:var(--success);font-size:.65rem;"></i><span class="rl-relief">${esc(r.reliefTeacher)}</span>
-          <span class="rl-arrow">ganti</span><i class="fas fa-user-slash" style="color:var(--danger);font-size:.6rem;"></i><span class="rl-absent">${esc(r.absentTeacher) || '—'}</span>
+    const key = r.absentTeacher || 'Tiada Nama';
+    if (!byAbsent[key]) byAbsent[key] = { reason: r.reason || '', slots: [] };
+    byAbsent[key].slots.push(r);
+  });
+  Object.values(byAbsent).forEach(g => g.slots.sort((a, b) => {
+    const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
+    return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
+  }));
+  const absentNames = Object.keys(byAbsent).sort((a, b) => a.localeCompare(b));
+
+  let h = `<div class="card"><div class="grp-list">`;
+  absentNames.forEach(name => {
+    const g = byAbsent[name];
+    h += `<div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
+      <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
+    g.slots.forEach(r => {
+      h += `<div class="grow">
+        <div class="gnum">${esc(r.period)}<span>${esc((r.time || '').split(' - ')[0])}</span></div>
+        <div style="flex:1;min-width:0;">
+          <div class="l-class">${esc(r.className)}</div>
+          <div class="l-subj"><i class="fas fa-book"></i>${esc(r.subject) || '—'}</div>
+          <div class="l-name">${esc(r.reliefTeacher)}</div>
+          ${r.note ? `<div class="grow-note"><i class="fas fa-sticky-note"></i>${esc(r.note)}</div>` : ''}
         </div>
-        ${r.note ? `<div class="rl-note"><i class="fas fa-sticky-note"></i>${esc(r.note)}</div>` : ''}
-      </div>
-    </div>`;
+      </div>`;
+    });
   });
   h += `</div></div>`;
   ct.innerHTML = h;
