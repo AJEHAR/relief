@@ -166,7 +166,7 @@
     .tt-guru-absent{background:var(--danger-light) !important;border-right-color:var(--danger-border) !important;}
     .tt-guru-absent .tt-guru-name{color:var(--danger);}
     .tt-guru-name{display:block;font-size:.65rem;font-weight:800;color:var(--navy);}
-    .tt-guru-tag{display:inline-block;margin-top:3px;font-size:.55rem;font-weight:800;padding:1px 6px;border-radius:8px;background:var(--danger-light);color:var(--danger);border:1px solid var(--danger-border);}
+    .tt-guru-tag{display:inline-block;margin-top:3px;font-size:.55rem;font-weight:800;padding:1px 6px;border-radius:8px;border:1px solid;}
 
     /* Slot cell */
     .tt-slot{height:64px;vertical-align:middle;cursor:default;}

@@ -11,6 +11,14 @@ export function todayStr() {
 }
 export function loadingCard() { return `<div class="card"><div class="state-box"><div class="spinner"></div><div class="s-sub">Memuatkan data...</div></div></div>`; }
 
+/** Kelas CSS ikut sebab ketidakhadiran — untuk warna konsisten merentas app */
+export function reasonClass(reason) {
+  if (reason === 'Cuti') return 'reason-cuti';
+  if (reason === 'Keluar Waktu Bekerja') return 'reason-keluar';
+  if (reason === 'Urusan Rasmi') return 'reason-rasmi';
+  return 'reason-lain';
+}
+
 // ── Skeleton generators — bentuk mengikut kandungan sebenar (kad berkumpulan,
 // jadual, grid) supaya peralihan ke data sebenar tak "melompat" ── 
 export function skeletonGroupedList(groups = 2, rowsPerGroup = 3) {

@@ -2,7 +2,7 @@ import { initNav, gatePage } from './nav.js';
 import { onAuthChange, isLoggedIn } from './auth.js';
 import * as db from './db.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, todayStr, setBanner, toast, skeletonGroupedList, skeletonTable } from './ui-utils.js';
+import { $, esc, todayStr, setBanner, toast, skeletonGroupedList, skeletonTable, reasonClass } from './ui-utils.js';
 
 initNav();
 
@@ -112,7 +112,7 @@ function renderInduk() {
   absentNames.forEach(name => {
     const g = byAbsent[name];
     h += `<div class="grp-card"><div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
-      <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
+      <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${g.reason ? `<span class="reason-chip ${reasonClass(g.reason)}">${esc(g.reason)}</span> · ` : ''}${g.slots.length} slot</div></div></div>`;
     g.slots.forEach(d => {
       const [tStart, tEnd] = String(d.time || '').split(' - ');
       h += `<div class="grow">

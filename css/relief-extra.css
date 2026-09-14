@@ -149,6 +149,13 @@
 #pick-name-ddwrap .dd-item-short-line{font-size:.68rem;font-weight:700;color:var(--muted);margin-top:2px;}
 .drawer-copyright{margin-top:12px;font-size:.65rem;color:#94a3b8;text-align:center;}
 
+/* Warna ikut sebab ketidakhadiran — konsisten merentas app */
+.reason-rasmi{background:#e0f2fe;color:#0369a1;border-color:#93c5fd;}
+.reason-cuti{background:#f0fdf4;color:#059669;border-color:#86efac;}
+.reason-keluar{background:#fffbeb;color:#d97706;border-color:#fde68a;}
+.reason-lain{background:#f1f5f9;color:#64748b;border-color:#cbd5e1;}
+.reason-chip{display:inline-block;padding:1px 7px;border-radius:8px;border:1px solid;font-weight:800;font-size:.66rem;}
+
 .slot-icon-btn{width:38px;height:38px;border-radius:10px;border:2px solid var(--border);background:#fff;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .slot-icon-btn.active{border-color:var(--teal);background:#eef9ff;}
 

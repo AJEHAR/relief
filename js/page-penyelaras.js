@@ -3,7 +3,7 @@ import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { getReliefFromAssignment } from './board-engine.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, escJs, todayStr, toast, showConfirm, skeletonGroupedList, skeletonTable, skeletonGrid, skeletonRows } from './ui-utils.js';
+import { $, esc, escJs, todayStr, toast, showConfirm, skeletonGroupedList, skeletonTable, skeletonGrid, skeletonRows, reasonClass } from './ui-utils.js';
 
 initNav();
 
@@ -77,9 +77,10 @@ function renderAbsentPanel() {
   wrap.innerHTML = ids.map(id => {
     const t = teachersList.find(x => x.id === id) || { name: id };
     const reason = (currentBoard.absentReasons || {})[id] || '—';
-    return `<span class="absent-tag" style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:20px;padding:6px 10px;font-size:.75rem;font-weight:700;margin:0 6px 6px 0;">
+    const rc = reasonClass(reason);
+    return `<span class="absent-tag ${rc}" style="display:inline-flex;align-items:center;gap:6px;border:1px solid;border-radius:20px;padding:6px 10px;font-size:.75rem;font-weight:700;margin:0 6px 6px 0;">
       <i class="fas fa-user-slash" style="font-size:.65rem;"></i> ${esc(t.name)} <span style="font-weight:500;opacity:.75;">(${esc(reason)})</span>
-      <button data-remove-id="${esc(id)}" class="btn-remove-absent" style="background:none;border:none;color:#b91c1c;cursor:pointer;padding:0 2px;"><i class="fas fa-times"></i></button>
+      <button data-remove-id="${esc(id)}" class="btn-remove-absent" style="background:none;border:none;color:inherit;cursor:pointer;padding:0 2px;"><i class="fas fa-times"></i></button>
     </span>`;
   }).join('');
   wrap.querySelectorAll('.btn-remove-absent').forEach(btn => btn.addEventListener('click', () => removeAbsent(btn.dataset.removeId)));
@@ -195,7 +196,7 @@ function renderTimetableGrid() {
 
     html += `<tr><td class="tt-sticky tt-guru-cell ${isAbsent ? 'tt-guru-absent' : ''}">
       <span class="tt-guru-name">${esc(shortName)}</span>
-      ${isAbsent ? `<span class="tt-guru-tag" title="${esc(reason)}">✗ ${esc(reason) || 'Tidak Hadir'}</span>` : ''}
+      ${isAbsent ? `<span class="tt-guru-tag ${reasonClass(reason)}" title="${esc(reason)}">✗ ${esc(reason) || 'Tidak Hadir'}</span>` : ''}
     </td>`;
 
     periods.forEach(p => {
@@ -476,7 +477,7 @@ function renderHistory(records) {
   absentNames.forEach(name => {
     const g = byAbsent[name];
     h += `<div class="grp-card"><div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
-      <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
+      <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${g.reason ? `<span class="reason-chip ${reasonClass(g.reason)}">${esc(g.reason)}</span> · ` : ''}${g.slots.length} slot</div></div></div>`;
     g.slots.forEach(r => {
       const [tStart, tEnd] = String(r.time || '').split(' - ');
       h += `<div class="grow">
