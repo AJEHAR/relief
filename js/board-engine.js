@@ -64,7 +64,7 @@ function buildPeriods(masterRows, customSlots, dayName) {
     for (let i = 0; i < periods.length; i++) {
       if (timeToMins(periods[i].start) >= slotEndMins) { insertIdx = i; break; }
     }
-    periods.splice(insertIdx, 0, { id: slot.id, start: slot.start, end: slot.end, isRehat: true, label: slot.label || 'Rehat' });
+    periods.splice(insertIdx, 0, { id: slot.id, start: slot.start, end: slot.end, isRehat: true, label: slot.label || 'Rehat', icon: slot.icon || '☕' });
   });
 
   return periods;

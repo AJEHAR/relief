@@ -43,12 +43,25 @@ export async function writePrintWindow(win, htmlContent, title) {
     if (logo) logoHtml = `<div class="pdf-header"><img src="${logo}" alt="Logo"></div>`;
   } catch (e) { /* logo pilihan sahaja, jangan gagalkan cetakan */ }
 
-  win.document.open();
-  win.document.write(`<!doctype html><html lang="ms"><head><meta charset="utf-8"><title>${title}</title>
+  const fullHtml = `<!doctype html><html lang="ms"><head><meta charset="utf-8"><title>${title}</title>
     <style>${PRINT_CSS}</style></head><body>${logoHtml}${htmlContent}
     <script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250);};</script>
-    </body></html>`);
-  win.document.close();
+    </body></html>`;
+
+  // Guna Blob + navigate (BUKAN document.write) — lebih stabil untuk laporan
+  // besar (ratusan KB, cth Laporan Mengikut Tempoh merentas banyak hari),
+  // terutama di browser mudah alih yang kurang stabil dgn document.write().
+  try {
+    const blob = new Blob([fullHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    win.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (e) {
+    // fallback kalau Blob/navigate gagal atas sebab tak dijangka
+    win.document.open();
+    win.document.write(fullHtml);
+    win.document.close();
+  }
 }
 
 /** Ringkasan: buka + tulis terus (guna bila TIADA async sebelum data sedia) */

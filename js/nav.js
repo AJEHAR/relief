@@ -11,7 +11,7 @@ export const PAGES = [
   { id: 'jadual-saya', href: 'ruang-guru.html', label: 'Jadual Saya', icon: 'fa-user', need: 'login', subs: [], hash: 'saya' },
   { id: 'kelas', href: 'ruang-guru.html', label: 'Kelas', icon: 'fa-door-open', need: 'login', subs: [], hash: 'kelas' },
   { id: 'penyelaras', href: 'penyelaras.html', label: 'Penyelaras GG', icon: 'fa-clipboard-list', need: 'admin', subs: [
-      { id: 'senarai', label: 'Senarai Nama Guru' }, { id: 'sejarah', label: 'Sejarah' }, { id: 'masa', label: 'Masa Jadual' }
+      { id: 'senarai', label: 'Senarai Nama Guru' }, { id: 'sejarah', label: 'Sejarah' }, { id: 'laporan', label: 'Laporan Mengikut Tempoh' }, { id: 'masa', label: 'Masa Jadual' }
   ]},
   { id: 'admin', href: 'admin.html', label: 'Admin', icon: 'fa-cog', need: 'admin', subs: [
       { id: 'xml', label: 'XML ASC' }, { id: 'logo', label: 'Jenama' }, { id: 'pengguna', label: 'Pengurusan Pengguna' }, { id: 'reset', label: 'Reset Data' }, { id: 'backup', label: 'Backup & Restore' }
@@ -238,7 +238,10 @@ function renderPickNameDD(q) {
     const hl = ql ? t.name.replace(new RegExp('(' + escRx(ql) + ')', 'gi'), '<em>$1</em>') : t.name;
     return `<div class="dd-item" data-id="${escJs(t.id)}">
       <div class="dd-item-avatar">${esc(getInitials(t.name))}</div>
-      <span class="dd-item-name">${hl}</span>${t.short ? `<span class="dd-item-short">${esc(t.short)}</span>` : ''}
+      <div class="dd-item-info">
+        <div class="dd-item-name">${hl}</div>
+        ${t.short ? `<div class="dd-item-short-line">${esc(t.short)}</div>` : ''}
+      </div>
     </div>`;
   }).join('');
   dd.querySelectorAll('.dd-item').forEach(el => el.addEventListener('mousedown', () => selectPickName(el.dataset.id)));

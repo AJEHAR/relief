@@ -83,7 +83,7 @@ function renderPersonalTimetable(ct, board) {
   let cTeach = 0, cRelief = 0, cOverride = 0, cFree = 0, rows = '';
   periods.forEach(p => {
     if (p.isRehat) {
-      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">☕<br>${esc(p.label || "Rehat")}</span></div>
+      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">${esc(p.icon || "☕")}<br>${esc(p.label || "Rehat")}</span></div>
         <div class="pt-content-col" style="justify-content:center;"><span class="slot-chip chip-rehat"><i class="fas fa-coffee" style="font-size:.6rem;"></i> ${esc(p.start)} — ${esc(p.end)}</span></div></div>`;
       return;
     }
@@ -269,7 +269,7 @@ function renderClassTimetable(ct, board) {
   let cNormal = 0, cGanti = 0, cFree = 0, rows = '';
   periods.forEach(p => {
     if (p.isRehat) {
-      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">☕<br>${esc(p.label || "Rehat")}</span></div>
+      rows += `<div class="pt-row row-rehat"><div class="pt-period-col"><span class="period-rehat-lbl">${esc(p.icon || "☕")}<br>${esc(p.label || "Rehat")}</span></div>
         <div class="pt-content-col" style="justify-content:center;"><span class="slot-chip chip-rehat"><i class="fas fa-coffee" style="font-size:.6rem;"></i> ${esc(p.start)} — ${esc(p.end)}</span></div></div>`;
       return;
     }

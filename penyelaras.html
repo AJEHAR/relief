@@ -128,7 +128,10 @@
         </div>
       </div>
       <div id="history-container"></div>
+    </div>
 
+    <!-- SUBPAGE: Laporan Mengikut Tempoh -->
+    <div id="sub-laporan" class="hidden fade-in">
       <div class="card admin-section">
         <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#0891b2,#0e7490);"><i class="fas fa-calendar-week"></i></div>
           <div><div class="card-head-title">Laporan Mengikut Tempoh</div><div class="card-head-sub">Jana satu PDF merangkumi julat tarikh atau setahun penuh</div></div></div>
@@ -157,6 +160,14 @@
           <div id="slot-list" style="margin-bottom:16px;"></div>
           <div style="background:#f8fafc;border-radius:12px;padding:14px;">
             <div id="slot-form-title" style="font-weight:800;color:var(--navy);font-size:.85rem;margin-bottom:10px;">+ Tambah Slot Baru</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;" id="slot-icon-picker">
+              <button type="button" class="slot-icon-btn" data-icon="☕">☕</button>
+              <button type="button" class="slot-icon-btn" data-icon="🏠">🏠</button>
+              <button type="button" class="slot-icon-btn" data-icon="🕌">🕌</button>
+              <button type="button" class="slot-icon-btn" data-icon="📢">📢</button>
+              <button type="button" class="slot-icon-btn" data-icon="🍽️">🍽️</button>
+              <button type="button" class="slot-icon-btn" data-icon="⭐">⭐</button>
+            </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
               <input type="text" id="slot-label" placeholder="Label (cth: Rehat, Perhimpunan)" class="input-field" style="flex:2;min-width:160px;">
               <input type="time" id="slot-start" class="input-field" style="flex:1;min-width:110px;">
