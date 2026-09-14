@@ -194,7 +194,11 @@ export async function initNav() {
 
   // ── Pilih Nama modal ──
   $('pick-name-search').addEventListener('input', () => { renderPickNameDD($('pick-name-search').value); $('pick-name-ddwrap').classList.add('open'); });
-  $('pick-name-search').addEventListener('focus', () => { renderPickNameDD($('pick-name-search').value); $('pick-name-ddwrap').classList.add('open'); });
+  $('pick-name-search').addEventListener('focus', () => {
+    renderPickNameDD($('pick-name-search').value);
+    $('pick-name-ddwrap').classList.add('open');
+    setTimeout(() => $('pick-name-search').scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  });
   document.addEventListener('click', e => { if (!$('pick-name-search-outer').contains(e.target)) $('pick-name-ddwrap').classList.remove('open'); });
   $('pick-name-skip').addEventListener('click', skipPickName);
   $('pick-name-skip-x').addEventListener('click', skipPickName);

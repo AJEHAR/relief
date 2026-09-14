@@ -380,7 +380,10 @@ gatePage('login', async () => {
   $('btn-print-kelas').addEventListener('click', printKelas);
   $('btn-clear-search').addEventListener('click', () => { $('tsearch').value = ''; renderDD(''); openDD(); $('tsearch').focus(); });
   $('tsearch').addEventListener('input', () => { renderDD($('tsearch').value); openDD(); });
-  $('tsearch').addEventListener('focus', () => { renderDD($('tsearch').value); openDD(); });
+  $('tsearch').addEventListener('focus', () => {
+    renderDD($('tsearch').value); openDD();
+    setTimeout(() => $('tsearch').scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  });
 
   switchSub(initialSub('saya'));
   window.addEventListener('hashchange', () => switchSub(initialSub('saya')));

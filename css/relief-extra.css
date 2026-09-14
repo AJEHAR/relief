@@ -129,6 +129,14 @@
 /* Kad carian nama (Pilih Nama Anda) — jangan potong dropdown yg melimpah keluar kad */
 #saya-pickname.card{overflow:visible;}
 #pickNameModal .modal-box{overflow:visible;}
+
+/* Modal "Pilih Nama" — anchor ke ATAS skrin (bukan bawah/tengah) supaya
+   dropdown carian tak tertutup papan kekik bila diketik di phone/tablet */
+#pickNameModal{align-items:flex-start !important;padding-top:16px;}
+#pickNameModal .modal-box{border-radius:22px;max-height:none;}
+@media (max-width:640px){
+  #pickNameModal{padding-top:8px;}
+}
 .drawer-copyright{margin-top:12px;font-size:.65rem;color:#94a3b8;text-align:center;}
 
 @keyframes skeleton-shimmer {
