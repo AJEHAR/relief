@@ -2,7 +2,7 @@ import { initNav, gatePage, initialSub } from './nav.js';
 import { authState } from './auth.js';
 import * as db from './db.js';
 import { processASCXML } from './xml-import.js';
-import { $, esc, toast, showConfirm, skeletonRows } from './ui-utils.js';
+import { $, esc, escJs, toast, showConfirm, skeletonRows } from './ui-utils.js';
 
 initNav();
 
@@ -94,13 +94,10 @@ async function loadUserMgmt() {
     <img src="${esc(u.photoURL || '')}" onerror="this.style.visibility='hidden'">
     <div class="u-meta"><div style="font-weight:700;font-size:.82rem;">${esc(u.name || u.email)}</div><div class="u-email">${esc(u.email)}</div></div>
     <select data-uid="${esc(u.uid)}" class="role-select">
-      <option value="pending" ${u.role !== 'admin' ? 'selected' : ''}>Guru / Belum Disahkan</option>
+      <option value="pending" ${u.role === 'pending' ? 'selected' : ''}>Belum Disahkan</option>
+      <option value="guru" ${u.role === 'guru' ? 'selected' : ''}>Guru</option>
       <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
     </select>
-    <!-- NOTA (fix): pilihan "Guru" yang berasingan dibuang — sistem sebenarnya
-         cuma bezakan admin vs bukan-admin (lihat auth.js isAdmin()), jadi
-         "Belum Disahkan" vs "Guru" TIDAK memberi kesan akses langsung. Label
-         digabung supaya admin tak tersalah anggap dia dah "sahkan" seseorang. -->
     <button class="btn-ghost btn-sm btn-del-user" data-uid="${esc(u.uid)}" data-name="${esc(u.name || u.email)}" style="color:#dc2626;margin-left:6px;" title="Padam profil pengguna ini"><i class="fas fa-trash"></i></button>
     </div>`).join('');
   wrap.querySelectorAll('.role-select').forEach(sel => sel.addEventListener('change', () => setUserRoleAction(sel.dataset.uid, sel.value)));

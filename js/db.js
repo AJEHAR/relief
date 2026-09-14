@@ -211,12 +211,9 @@ export async function updateAssignment(payload) {
     const board = await getDailyBoard(payload.date);
     const assignments = { ...board.assignments };
     const reliefTeacher = payload.reliefTeacher || '';
-    const reliefTeacherId = payload.reliefTeacherId || '';
     const note = payload.note || '';
     if (reliefTeacher || note) {
-      // reliefId disimpan bersama nama — padanan tugasan ni jadi stabil walau
-      // nama guru berkenaan ditukar/disunting kemudian (lihat board-engine.js).
-      assignments[payload.assignKey] = { relief: reliefTeacher, note, reliefId: reliefTeacherId };
+      assignments[payload.assignKey] = { relief: reliefTeacher, note };
     } else {
       delete assignments[payload.assignKey];
     }
@@ -244,23 +241,19 @@ export async function confirmDailyBoard(payload) {
     const rows = [];
 
     Object.entries(board.assignments || {}).forEach(([key, val]) => {
-      const { relief: reliefTeacher, note, reliefId } = getReliefFromAssignment(val);
+      const { relief: reliefTeacher, note } = getReliefFromAssignment(val);
       if (!reliefTeacher) return;
-      // NOTA (fix): className boleh (jarang) mengandungi '|' — guna slice(2) &
-      // gabung semula, bukan destructure 3-bahagian tegar (yg akan potong
-      // className secara senyap kalau ia ada '|').
-      const parts = key.split('|');
-      const teacherId = parts[0], periodId = parts[1], className = parts.slice(2).join('|');
+      const [teacherId, periodId, className] = key.split('|');
       const slotArr = (board.teacherMap && board.teacherMap[teacherId] && board.teacherMap[teacherId][periodId]) || [];
       const slot = slotArr.find(s => s.className === className) || slotArr[0];
       if (!slot) return;
       const period = (board.periods || []).find(p => p.id === periodId) || {};
-      const time = period.start && period.end ? `${period.start} \u2013 ${period.end}` : '';
+      const time = period.start && period.end ? `${period.start} - ${period.end}` : '';
       const reason = (board.absentReasons || {})[teacherId] || '';
       rows.push({
         batchId, date: payload.date, day: dayName, period: periodId, time,
         className, subject: slot.subject, absentTeacher: slot.teacherName,
-        reliefTeacher, reliefTeacherId: reliefId || '', timestamp: serverTimestamp(), note, reason
+        reliefTeacher, timestamp: serverTimestamp(), note, reason
       });
     });
 

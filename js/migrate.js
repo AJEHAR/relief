@@ -79,20 +79,9 @@ window.importTeachers = async function () {
       id: String(r.ID).trim(), name: String(r.Name).trim(), short: String(r.Short || '').trim(),
       contact: String(r.Contact || ''), email: String(r.Email || '')
     }));
-    // NOTA (fix): dulu ni overwrite terus & buang "Guru Tambahan" (EXTRA_) sedia
-    // ada yang mungkin dah ditambah dlm app — sekarang kekalkan mereka, sama
-    // macam kelakuan xml-import.js.
-    log('  Menggabung guru tambahan (EXTRA_) sedia ada...');
-    let existingExtras = [];
-    try {
-      const existingSnap = await getDoc(doc(dbFs, 'teachers', 'data'));
-      const existingList = existingSnap.exists() ? (existingSnap.data().list || []) : [];
-      existingExtras = existingList.filter(t => String(t.id).startsWith('EXTRA_'));
-    } catch (e) { /* tiada data sedia ada lagi, abaikan */ }
-    const fullList = [...list, ...existingExtras];
-    log(`  ${list.length} guru dari CSV + ${existingExtras.length} guru tambahan sedia ada. Menulis (1 dokumen besar — elak kuota reads)...`);
-    await setDoc(doc(dbFs, 'teachers', 'data'), { list: fullList });
-    log(`✅ ${list.length} guru berjaya diimport (${existingExtras.length} guru tambahan dikekalkan).`);
+    log(`  ${list.length} guru dijumpai. Menulis (1 dokumen besar — elak kuota reads)...`);
+    await setDoc(doc(dbFs, 'teachers', 'data'), { list });
+    log(`✅ ${list.length} guru berjaya diimport.`);
   } catch (e) { log('❌ Ralat: ' + e.message); }
 };
 

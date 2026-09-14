@@ -102,26 +102,19 @@ export async function processASCXML(fileContent, onProgress) {
         const teacherIdList = lesson.teacherIds
           ? lesson.teacherIds.split(',').map(t => t.trim()).filter(Boolean)
           : [''];
-        // NOTA (fix): lesson boleh ada >1 classIds (kelas gabungan/combined class,
-        // biasa dalam jadual SpEd). Dulu cuma classIds[0] diambil — kelas ke-2
-        // dst hilang senyap dari jadual. Sekarang loop SEMUA kelas dalam lesson.
-        const classIdList = lesson.classIds
-          ? lesson.classIds.split(',').map(c => c.trim()).filter(Boolean)
-          : [''];
+        const mainClassId = lesson.classIds ? lesson.classIds.split(',')[0].trim() : '';
+        const classObj = classesMap[mainClassId] || { name: mainClassId ? 'ID:' + mainClassId : 'Tiada Kelas' };
         const subject = subjectsMap[lesson.subjectId] || { name: lesson.subjectId || 'Tiada Subjek', short: '' };
 
-        classIdList.forEach(classId => {
-          const classObj = classesMap[classId] || { name: classId ? 'ID:' + classId : 'Tiada Kelas' };
-          teacherIdList.forEach(tid => {
-            const teacher = teachersMap[tid] || { name: tid ? 'ID:' + tid : 'Tiada Guru' };
-            masterData.push({
-              day: dayName, period: periodId, start: period.start, end: period.end,
-              classId, className: classObj.name,
-              subId: lesson.subjectId, subject: subject.name,
-              teacherId: tid, teacherName: teacher.name
-            });
-            cRows++;
+        teacherIdList.forEach(tid => {
+          const teacher = teachersMap[tid] || { name: tid ? 'ID:' + tid : 'Tiada Guru' };
+          masterData.push({
+            day: dayName, period: periodId, start: period.start, end: period.end,
+            classId: mainClassId, className: classObj.name,
+            subId: lesson.subjectId, subject: subject.name,
+            teacherId: tid, teacherName: teacher.name
           });
+          cRows++;
         });
       }
       if (!hadValidDay) cNoDays++;

@@ -3,10 +3,6 @@
 // ═══════════════════════════════════════════════════════════
 export function $(id) { return document.getElementById(id); }
 export function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-/** Escape utk letak dalam JS STRING LITERAL sahaja (cth: dalam <script> inline).
- * JANGAN guna untuk nilai atribut HTML (data-*, dll) — guna esc() untuk itu,
- * sebab escJs() escape guna backslash yang HTML TIDAK faham sebagai escape
- * tanda petik (attribute boleh "pecah" kalau nilai ada tanda petik). */
 export function escJs(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
 export function escRx(s) { return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 export function todayStr() {

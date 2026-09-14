@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 import { authState, onAuthChange, loginWithGoogle, logout, isAdmin, isLoggedIn, deleteMyProfile, setMyTeacherId } from './auth.js';
 import { getBranding, getLogo, getTeacherList, getGuruPageData } from './db.js';
-import { $, esc, escRx, toast } from './ui-utils.js';
+import { $, esc, escJs, escRx, toast } from './ui-utils.js';
 
 export const PAGES = [
   { id: 'jadual', href: 'index.html', label: 'Jadual Ganti', icon: 'fa-list-alt', need: null, subs: [] },
@@ -223,7 +223,7 @@ function renderPickNameDD(q) {
   if (!filtered.length) { dd.innerHTML = `<div class="dd-empty"><i class="fas fa-search"></i>Tiada guru dijumpai.</div>`; return; }
   dd.innerHTML = filtered.map(t => {
     const hl = ql ? t.name.replace(new RegExp('(' + escRx(ql) + ')', 'gi'), '<em>$1</em>') : t.name;
-    return `<div class="dd-item" data-id="${esc(t.id)}">
+    return `<div class="dd-item" data-id="${escJs(t.id)}">
       <div class="dd-item-avatar">${esc(getInitials(t.name))}</div>
       <span class="dd-item-name">${hl}</span>${t.short ? `<span class="dd-item-short">${esc(t.short)}</span>` : ''}
     </div>`;
@@ -234,12 +234,7 @@ function renderPickNameDD(q) {
 async function selectPickName(id) {
   const t = (_pickNameTeachers || []).find(x => x.id === id);
   if (!t) return;
-  let res = await setMyTeacherId(id);
-  if (!res.success && res.clash) {
-    const ok = confirm(`${res.message}\n\nTeruskan pautkan nama ini ke akaun anda juga? (Kedua-dua akaun akan tertanda sebagai "${t.name}".)`);
-    if (!ok) return;
-    res = await setMyTeacherId(id, { force: true });
-  }
+  const res = await setMyTeacherId(id);
   if (!res.success) { toast('Gagal simpan pautan nama: ' + res.message, 'error'); return; }
   $('pickNameModal').classList.add('hidden');
   checkTodayDuty();
@@ -281,8 +276,7 @@ async function checkTodayDuty() {
     const today = new Date();
     const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     const res = await getGuruPageData(dateStr);
-    // Utamakan padanan ikut ID guru (stabil); fallback ke nama utk rekod lama.
-    const duties = res.board?.reliefDuties?.[t.id] || res.board?.reliefDuties?.[t.name];
+    const duties = res.board?.reliefDuties?.[t.name];
     todayDutyCount = duties ? duties.length : 0;
     updateNameDisplay();
   } catch (e) { /* senyap — bukan ciri kritikal */ }

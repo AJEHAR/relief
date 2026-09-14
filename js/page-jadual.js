@@ -114,9 +114,7 @@ function renderInduk() {
     h += `<div class="grp-card"><div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
       <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
     g.slots.forEach(d => {
-      // NOTA: board-engine.js simpan "time" guna en-dash (–), bukan hyphen (-) —
-      // split guna regex supaya kedua-dua bentuk (& variasi spacing) disokong.
-      const [tStart, tEnd] = String(d.time || '').split(/\s*[-\u2013]\s*/);
+      const [tStart, tEnd] = String(d.time || '').split(' - ');
       h += `<div class="grow">
         <div class="gnum-col"><div class="gnum">${esc(d.period)}</div><div class="gtime">${esc(tStart || '')}<br>${esc(tEnd || '')}</div></div>
         <div style="flex:1;min-width:0;">

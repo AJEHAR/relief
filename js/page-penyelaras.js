@@ -3,7 +3,7 @@ import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { getReliefFromAssignment } from './board-engine.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, todayStr, toast, showConfirm, skeletonGroupedList, skeletonTable, skeletonGrid, skeletonRows } from './ui-utils.js';
+import { $, esc, escJs, todayStr, toast, showConfirm, skeletonGroupedList, skeletonTable, skeletonGrid, skeletonRows } from './ui-utils.js';
 
 initNav();
 
@@ -165,23 +165,17 @@ function renderTimetableGrid() {
   $('stat-normal').textContent = statNormal + ' slot biasa';
   statBar.style.display = 'flex';
 
-  // NOTA (fix): dikunci ikut ID guru (reliefId) DAN nama — supaya "sedang bertugas
-  // relief di tempat lain" (isOverride/isOnReliefDuty) tetap tepat walau ada nama
-  // guru pendua atau rekod lama (pra-reliefId) yang cuma ada nama.
   const reliefDutyMap = {};
-  const reliefDutyClassMap = {}; // kunci -> periodId -> className (elak scan berulang setiap sel)
+  const reliefDutyClassMap = {}; // reliefName -> periodId -> className (elak scan berulang setiap sel)
   Object.entries(board.assignments || {}).forEach(([key, val]) => {
-    const { relief: reliefName, reliefId } = getReliefFromAssignment(val);
+    const reliefName = getReliefFromAssignment(val).relief;
     if (!reliefName) return;
     const periodId = key.split('|')[1];
     const className = key.split('|')[2];
-    const marksKeys = reliefId ? [reliefId, reliefName] : [reliefName];
-    marksKeys.forEach(k => {
-      if (!reliefDutyMap[k]) reliefDutyMap[k] = new Set();
-      reliefDutyMap[k].add(periodId);
-      if (!reliefDutyClassMap[k]) reliefDutyClassMap[k] = {};
-      reliefDutyClassMap[k][periodId] = className;
-    });
+    if (!reliefDutyMap[reliefName]) reliefDutyMap[reliefName] = new Set();
+    reliefDutyMap[reliefName].add(periodId);
+    if (!reliefDutyClassMap[reliefName]) reliefDutyClassMap[reliefName] = {};
+    reliefDutyClassMap[reliefName][periodId] = className;
   });
 
   let html = '<table class="tt-table"><thead><tr class="tt-head-row">';
@@ -203,18 +197,14 @@ function renderTimetableGrid() {
       ${isAbsent ? `<span class="tt-guru-tag" title="${esc(reason)}">✗ ${esc(reason) || 'Tidak Hadir'}</span>` : ''}
     </td>`;
 
-    // Utamakan padanan ikut ID guru (g.id), fallback ke nama (g.name) utk rekod lama.
-    const gDutySet = reliefDutyMap[g.id] || reliefDutyMap[g.name];
-    const gDutyClassMap = reliefDutyClassMap[g.id] || reliefDutyClassMap[g.name];
-
     periods.forEach(p => {
       if (p.isRehat) { html += `<td class="tt-slot s-rehat"><div class="tt-slot-inner"><div class="tt-rehat-inner"><div class="tt-rehat-text">${esc(p.label || 'Rehat')}</div></div></div></td>`; return; }
       const cells = g.slots[p.id] || [];
-      const isOnReliefDuty = gDutySet?.has(String(p.id));
+      const isOnReliefDuty = reliefDutyMap[g.name]?.has(String(p.id));
 
       if (!cells.length) {
         if (isOnReliefDuty) {
-          const dutyClassName = gDutyClassMap?.[String(p.id)] || '?';
+          const dutyClassName = reliefDutyClassMap[g.name]?.[String(p.id)] || '?';
           html += `<td class="tt-slot s-relief-duty"><div class="tt-slot-inner"><div class="tt-slot-subj">📌 Relief</div><div class="tt-slot-duty-badge"><i class="fas fa-arrow-right" style="font-size:.4rem;"></i>${esc(dutyClassName)}</div></div></td>`;
         } else {
           html += `<td class="tt-slot s-empty"><div class="tt-slot-inner"></div></td>`;
@@ -222,61 +212,35 @@ function renderTimetableGrid() {
         return;
       }
 
-      // NOTA (fix): guru boleh ada >1 kelas SERENTAK pada waktu sama (kelas
-      // gabungan / team-teaching). Dulu cuma cells[0] dipaparkan & assignable —
-      // kelas ke-2 dst tak boleh diisi guru ganti langsung dari grid ni.
-      // Sekarang setiap kelas dalam slot ni dipapar & assignable berasingan.
-      const isOverride = !isAbsent && gDutySet?.has(String(p.id));
-      const anyDone = isAbsent && cells.some(c => c.reliefTeacher);
-      const allDone = isAbsent && cells.every(c => c.reliefTeacher);
-      let slotClass = 's-normal';
-      if (isOverride) slotClass = 's-override';
-      // NOTA (fix): bila >1 kelas serentak & CUMA SEBAHAGIAN diisi guru ganti,
-      // guna 's-partial' (oren) — kelas CSS ni dah sedia ada tapi tak pernah
-      // digunakan sebelum ni (keadaan "sebahagian" tak boleh berlaku semasa
-      // cuma 1 kelas seslot). Sekarang ia jadi status yang bermakna.
-      else if (isAbsent) slotClass = allDone ? 's-done' : (anyDone ? 's-partial' : 's-absent');
-
-      const innerHtml = cells.map(cell => {
-        if (!isAbsent) {
-          if (isOverride) {
-            const dutyClass = gDutyClassMap?.[String(p.id)] || '?';
-            return `<div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div><div class="tt-slot-override-badge">⚠️ +Relief ${esc(dutyClass)}</div></div>`;
-          }
-          return `<div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div></div>`;
-        }
-        let reliefHtml;
-        if (cell.reliefTeacher) {
-          const rParts = cell.reliefTeacher.split(' ');
-          const rShort = rParts.length > 2 ? rParts[0] + ' ' + rParts[1] : cell.reliefTeacher;
-          const noteIcon = cell.note ? `<span class="tt-slot-note-icon">📝</span>` : '';
-          reliefHtml = `<div class="tt-slot-relief"><i class="fas fa-check" style="font-size:.45rem;"></i>${esc(rShort)}${noteIcon}</div>`;
+      const cell = cells[0];
+      if (!isAbsent) {
+        const isOverride = reliefDutyMap[g.name]?.has(String(p.id));
+        if (isOverride) {
+          const dutyClass = reliefDutyClassMap[g.name]?.[String(p.id)] || '?';
+          html += `<td class="tt-slot s-override"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div><div class="tt-slot-override-badge">⚠️ +Relief ${esc(dutyClass)}</div></div></td>`;
         } else {
-          reliefHtml = `<div class="tt-slot-add"><i class="fas fa-plus" style="font-size:.45rem;"></i>Isi</div>`;
+          html += `<td class="tt-slot s-normal"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div></div></td>`;
         }
-        return `<div class="tt-slot-inner" data-assign-key="${esc(cell.assignKey)}" style="cursor:pointer;">
-          <div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div>${reliefHtml}
-        </div>`;
-      }).join(cells.length > 1 ? '<div style="border-top:1px dashed rgba(0,0,0,.12);margin:3px 0;"></div>' : '');
+        return;
+      }
 
-      // Setiap .tt-slot-inner yang assignable bawa data-assign-key sendiri
-      // (termasuk kes 1 kelas sahaja) — <td> induk TIDAK perlu attribute sama,
-      // elak pertindihan sasaran klik. Kelas "tt-slot-multi" ditambah bila >1
-      // kelas serentak supaya CSS elak paksa setiap sub-slot isi 100% x 64px
-      // (lihat style.css) — tinggi jadi ikut kandungan (auto), padat & kemas.
-      const multiClass = cells.length > 1 ? ' tt-slot-multi' : '';
-      html += `<td class="tt-slot ${slotClass}${multiClass}">${innerHtml}</td>`;
+      let slotClass = cell.reliefTeacher ? 's-done' : 's-absent';
+      let reliefHtml = '';
+      if (cell.reliefTeacher) {
+        const rParts = cell.reliefTeacher.split(' ');
+        const rShort = rParts.length > 2 ? rParts[0] + ' ' + rParts[1] : cell.reliefTeacher;
+        const noteIcon = cell.note ? `<span class="tt-slot-note-icon">📝</span>` : '';
+        reliefHtml = `<div class="tt-slot-relief"><i class="fas fa-check" style="font-size:.45rem;"></i>${esc(rShort)}${noteIcon}</div>`;
+      } else {
+        reliefHtml = `<div class="tt-slot-add"><i class="fas fa-plus" style="font-size:.45rem;"></i>Isi</div>`;
+      }
+      html += `<td class="tt-slot ${slotClass}" data-assign-key="${escJs(cell.assignKey)}"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div>${reliefHtml}</div></td>`;
     });
     html += `</tr>`;
   });
   html += '</tbody></table>';
   container.innerHTML = html;
-  // Sasaran klik: setiap .tt-slot-inner yang ada data-assign-key (1 atau lebih
-  // per <td>, bergantung bilangan kelas serentak pada waktu tu).
-  container.querySelectorAll('[data-assign-key]').forEach(el => el.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openAssignModal(el.dataset.assignKey);
-  }));
+  container.querySelectorAll('.tt-slot[data-assign-key]').forEach(td => td.addEventListener('click', () => openAssignModal(td.dataset.assignKey)));
 }
 
 // ── Assign modal ──
@@ -301,34 +265,25 @@ function renderAssignList() {
   const { periodId, assignKey } = currentAssignSlot;
   const q = ($('assign-search').value || '').trim().toLowerCase();
   const availList = currentBoard.periodAvailMap?.[periodId] || [];
-  const { relief: currentRelief, reliefId: currentReliefId } = getReliefFromAssignment(currentBoard.assignments?.[assignKey]);
+  const currentRelief = getReliefFromAssignment(currentBoard.assignments?.[assignKey]).relief;
 
-  // NOTA (fix): set "sibuk" dikunci ikut ID bila ada (reliefBusyIdSet), nama
-  // sebagai fallback (reliefBusyNameSet) — elak seorang guru lain dgn nama
-  // sama disilap anggap "sibuk", & elak guru yg namanya ditukar terlepas semak.
-  const reliefBusyIdSet = new Set();
-  const reliefBusyNameSet = new Set();
+  const reliefBusySet = new Set();
   Object.entries(currentBoard.assignments || {}).forEach(([key, val]) => {
-    const { relief: name, reliefId: rid } = getReliefFromAssignment(val);
+    const name = getReliefFromAssignment(val).relief;
     if (!name) return;
-    if (key.split('|')[1] === periodId && key !== assignKey) {
-      if (rid) reliefBusyIdSet.add(rid); else reliefBusyNameSet.add(name);
-    }
+    if (key.split('|')[1] === periodId && key !== assignKey) reliefBusySet.add(name);
   });
-  const isBusy = (t) => reliefBusyIdSet.has(t.id) || reliefBusyNameSet.has(t.name);
 
-  let pool = overrideOn ? teachersList.map(t => availList.find(a => a.id === t.id) || { ...t, freeSlots: '—', busyPeriods: '—', reliefCount: 0 }) : availList.filter(t => !isBusy(t));
+  let pool = overrideOn ? teachersList.map(t => availList.find(a => a.id === t.id) || { ...t, freeSlots: '—', busyPeriods: '—', reliefCount: 0 }) : availList.filter(t => !reliefBusySet.has(t.name));
   if (q) pool = pool.filter(t => t.name.toLowerCase().includes(q));
   pool = [...pool].sort((a, b) => (b.freeSlots === '—' ? -1 : b.freeSlots) - (a.freeSlots === '—' ? -1 : a.freeSlots));
 
   $('assign-available-list').innerHTML = pool.length ? pool.map(t => {
-    const isSelected = currentReliefId ? currentReliefId === t.id : currentRelief === t.name;
-    const isBusyRelief = isBusy(t);
+    const isSelected = currentRelief === t.name;
+    const isBusyRelief = reliefBusySet.has(t.name);
     const isAbsent = (currentBoard.absentIds || []).includes(t.id);
     const clickable = overrideOn ? true : (!isAbsent && !isBusyRelief);
-    // NOTA (fix): data-select-id ditambah (bukan cuma data-select-name) supaya
-    // tugasan disimpan dgn reliefId yg stabil, bukan semata-mata nama teks.
-    return `<div class="assign-teacher-card ${isSelected ? 'selected' : ''}" style="${!clickable ? 'opacity:.5;' : 'cursor:pointer;'}" data-select-id="${clickable ? esc(t.id) : ''}" data-select-name="${clickable ? esc(t.name) : ''}">
+    return `<div class="assign-teacher-card ${isSelected ? 'selected' : ''}" style="${!clickable ? 'opacity:.5;' : 'cursor:pointer;'}" data-select-name="${clickable ? esc(t.name) : ''}">
       <div style="flex:1;min-width:0;">
         <div class="assign-teacher-name">${esc(t.name)}</div>
         <div class="assign-teacher-stats">
@@ -339,21 +294,19 @@ function renderAssignList() {
           ${isBusyRelief ? `<span class="assign-stat-chip assign-stat-busy">📌 Relief lain</span>` : ''}
         </div>
       </div>
-      ${clickable ? `<button class="btn-assign ${isSelected ? 'selected' : ''}" data-select-id="${esc(t.id)}" data-select-name="${esc(t.name)}">${isSelected ? '<i class="fas fa-check"></i>' : '<i class="fas fa-hand-pointer"></i>'}</button>` : ''}
+      ${clickable ? `<button class="btn-assign ${isSelected ? 'selected' : ''}" data-select-name="${esc(t.name)}">${isSelected ? '<i class="fas fa-check"></i>' : '<i class="fas fa-hand-pointer"></i>'}</button>` : ''}
     </div>`;
   }).join('') : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:.85rem;">Tiada guru sepadan.</div>`;
 
   $('assign-available-list').querySelectorAll('[data-select-name]').forEach(el => {
-    if (el.dataset.selectName) el.addEventListener('click', (ev) => { ev.stopPropagation(); selectTeacher(el.dataset.selectId, el.dataset.selectName); });
+    if (el.dataset.selectName) el.addEventListener('click', (ev) => { ev.stopPropagation(); selectTeacher(el.dataset.selectName); });
   });
 }
 
-async function selectTeacher(teacherId, teacherName) {
+async function selectTeacher(teacherName) {
   if (!currentAssignSlot) return;
   const note = $('assign-note').value.trim();
-  // NOTA (fix): reliefId dihantar bersama nama — db.js simpan kedua-duanya
-  // supaya padanan guru ganti pada rekod ni stabil walau nama ditukar kemudian.
-  const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: teacherName, reliefTeacherId: teacherId, note });
+  const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: teacherName, note });
   if (!res.success) return toast('Gagal simpan: ' + res.message, 'error');
   currentBoard = res;
   renderTimetableGrid(); closeAssignModal(); renderBoardStatus();
@@ -369,8 +322,8 @@ async function clearAssignment() {
 async function saveNoteOnly() {
   if (!currentAssignSlot) return;
   const note = $('assign-note').value.trim();
-  const { relief: existing, reliefId: existingId } = getReliefFromAssignment(currentBoard.assignments?.[currentAssignSlot.assignKey]);
-  const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: existing, reliefTeacherId: existingId, note });
+  const existing = getReliefFromAssignment(currentBoard.assignments?.[currentAssignSlot.assignKey]).relief;
+  const res = await db.updateAssignment({ date: getDate(), assignKey: currentAssignSlot.assignKey, reliefTeacher: existing, note });
   if (!res.success) return toast('Gagal: ' + res.message, 'error');
   currentBoard = res;
   renderTimetableGrid(); closeAssignModal();
@@ -524,9 +477,7 @@ function renderHistory(records) {
     h += `<div class="grp-card"><div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>
       <div style="flex:1;min-width:0;"><div class="grp-name">${esc(name)}</div><div class="grp-meta">${esc(g.reason) ? esc(g.reason) + ' · ' : ''}${g.slots.length} slot</div></div></div>`;
     g.slots.forEach(r => {
-      // NOTA: board-engine.js simpan "time" guna en-dash (–), bukan hyphen (-) —
-      // split guna regex supaya kedua-dua bentuk (& variasi spacing) disokong.
-      const [tStart, tEnd] = String(r.time || '').split(/\s*[-\u2013]\s*/);
+      const [tStart, tEnd] = String(r.time || '').split(' - ');
       h += `<div class="grow">
         <div class="gnum-col"><div class="gnum">${esc(r.period)}</div><div class="gtime">${esc(tStart || '')}<br>${esc(tEnd || '')}</div></div>
         <div style="flex:1;min-width:0;">
