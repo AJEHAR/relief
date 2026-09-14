@@ -85,6 +85,7 @@ function navShellHtml(branding, logoB64) {
         <div id="user-chip" class="user-chip hidden">
           <img id="user-photo" class="user-photo" src="" alt="">
           <div class="user-meta"><div id="user-name" class="user-name">—</div><div id="user-role" class="user-role">—</div></div>
+          <button class="btn-logout" id="btn-delete-account-top" title="Padam Akaun" style="color:rgba(255,255,255,.45);"><i class="fas fa-user-slash"></i></button>
           <button class="btn-logout" id="btn-logout" title="Log Keluar"><i class="fas fa-sign-out-alt"></i></button>
         </div>
       </div>
@@ -178,13 +179,15 @@ export async function initNav() {
   $('btn-logout').addEventListener('click', logout);
   $('drawer-btn-login').addEventListener('click', loginWithGoogle);
   $('drawer-btn-logout').addEventListener('click', logout);
-  $('drawer-btn-delete-account').addEventListener('click', async () => {
+  async function handleDeleteAccount() {
     const ok = confirm('Padam akaun/profil anda dari sistem ni?\n\nIni cuma buang rekod role & pautan nama guru anda dalam sistem — akaun Google anda sendiri TIDAK dipadam. Anda boleh log masuk semula lepas ni (akan mula semula sebagai "Belum Disahkan").\n\nTeruskan?');
     if (!ok) return;
     const res = await deleteMyProfile();
     if (!res.success) { toast('Gagal padam akaun: ' + res.message, 'error'); return; }
     location.href = 'index.html';
-  });
+  }
+  $('drawer-btn-delete-account').addEventListener('click', handleDeleteAccount);
+  $('btn-delete-account-top').addEventListener('click', handleDeleteAccount);
 
   onAuthChange(renderAuthUI);
   window.addEventListener('hashchange', applyActiveHighlight);

@@ -126,6 +126,9 @@
    SKELETON LOADING — shimmer, gantikan spinner untuk
    senarai/kad/jadual yang bentuknya dah dijangka
    ═══════════════════════════════════════════════════ */
+/* Kad carian nama (Pilih Nama Anda) — jangan potong dropdown yg melimpah keluar kad */
+#saya-pickname.card{overflow:visible;}
+#pickNameModal .modal-box{overflow:visible;}
 .drawer-copyright{margin-top:12px;font-size:.65rem;color:#94a3b8;text-align:center;}
 
 @keyframes skeleton-shimmer {

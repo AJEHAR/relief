@@ -32,6 +32,7 @@ export async function loginWithGoogle() {
 }
 
 export async function logout() {
+  sessionStorage.removeItem('pickNameSkipped');
   await fbSignOut(auth);
 }
 
@@ -73,6 +74,7 @@ export async function deleteMyProfile() {
   try {
     const uid = authState.user.uid;
     await deleteDoc(doc(dbFs, 'users', uid));
+    sessionStorage.removeItem('pickNameSkipped');
     await fbSignOut(auth);
     return { success: true };
   } catch (e) { return { success: false, message: e.message || String(e) }; }
