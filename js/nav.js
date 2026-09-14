@@ -8,37 +8,42 @@ import { $, esc, escJs, escRx, toast } from './ui-utils.js';
 export const PAGES = [
   { id: 'jadual', href: 'index.html', label: 'Jadual Ganti', icon: 'fa-list-alt', need: null, subs: [] },
   { id: 'jadual-induk', href: 'penyelaras.html', label: 'Jadual Induk', icon: 'fa-th', need: 'admin', subs: [] },
-  { id: 'ruang-guru', href: 'ruang-guru.html', label: 'Ruang Guru', icon: 'fa-user-graduate', need: 'login', subs: [
-      { id: 'saya', label: 'Jadual Saya' }, { id: 'kelas', label: 'Kelas' }
-  ]},
+  { id: 'jadual-saya', href: 'ruang-guru.html', label: 'Jadual Saya', icon: 'fa-user', need: 'login', subs: [], hash: 'saya' },
+  { id: 'kelas', href: 'ruang-guru.html', label: 'Kelas', icon: 'fa-door-open', need: 'login', subs: [], hash: 'kelas' },
   { id: 'penyelaras', href: 'penyelaras.html', label: 'Penyelaras GG', icon: 'fa-clipboard-list', need: 'admin', subs: [
       { id: 'senarai', label: 'Senarai Nama Guru' }, { id: 'sejarah', label: 'Sejarah' }, { id: 'masa', label: 'Masa Jadual' }
   ]},
   { id: 'admin', href: 'admin.html', label: 'Admin', icon: 'fa-cog', need: 'admin', subs: [
-      { id: 'xml', label: 'XML ASC' }, { id: 'logo', label: 'Jenama' }, { id: 'pengguna', label: 'Pengurusan Pengguna' }, { id: 'reset', label: 'Reset Data' }
+      { id: 'xml', label: 'XML ASC' }, { id: 'logo', label: 'Jenama' }, { id: 'pengguna', label: 'Pengurusan Pengguna' }, { id: 'reset', label: 'Reset Data' }, { id: 'backup', label: 'Backup & Restore' }
   ]},
 ];
 
 /** Tentukan page id aktif berdasarkan URL semasa (fail + hash). Uruskan
- * kes khas: penyelaras.html dikongsi oleh 2 entri nav (jadual-induk & penyelaras). */
+ * kes khas: fail dikongsi oleh >1 entri nav (cth ruang-guru.html oleh
+ * jadual-saya & kelas; penyelaras.html oleh jadual-induk & penyelaras). */
 function resolveActivePage() {
   const path = (location.pathname.split('/').pop() || 'index.html');
   const hash = (location.hash || '').replace('#', '');
   const candidates = PAGES.filter(p => p.href === path);
   if (candidates.length === 1) return candidates[0].id;
-  // lebih daripada 1 page kongsi fail sama — cari yang subs.id sepadan hash dulu
+  // lebih daripada 1 page kongsi fail sama:
+  // 1) cari yang subs.id sepadan hash (cth Penyelaras GG punya subpage)
   const withSubMatch = candidates.find(p => p.subs.some(s => s.id === hash));
   if (withSubMatch) return withSubMatch.id;
-  // jika tiada, guna page yang subs=[] (dianggap default/halaman utama fail tu)
-  const direct = candidates.find(p => p.subs.length === 0);
-  return direct ? direct.id : candidates[0].id;
+  // 2) cari direct-link (subs=[]) dgn 'hash' eksplisit sepadan (cth Jadual Saya vs Kelas)
+  const exactDirect = candidates.find(p => p.subs.length === 0 && p.hash === hash);
+  if (exactDirect) return exactDirect.id;
+  // 3) fallback: direct-link TANPA hash eksplisit (cth Jadual Induk, default fail tu)
+  const genericDirect = candidates.find(p => p.subs.length === 0 && !p.hash);
+  return genericDirect ? genericDirect.id : candidates[0].id;
 }
 
 function subUrl(p, s) { return p.href + '#' + s.id; }
 
 function desktopItemHtml(p) {
   if (!p.subs.length) {
-    return `<a href="${p.href}" class="page-link" data-page="${p.id}" data-need="${p.need || ''}"><i class="fas ${p.icon}"></i><span>${p.label}</span></a>`;
+    const linkHref = p.hash ? `${p.href}#${p.hash}` : p.href;
+    return `<a href="${linkHref}" class="page-link" data-page="${p.id}" data-need="${p.need || ''}"><i class="fas ${p.icon}"></i><span>${p.label}</span></a>`;
   }
   return `<div class="page-link-wrap" data-need="${p.need || ''}">
     <button class="page-link page-link-btn" data-page="${p.id}" data-toggle-dd="${p.id}"><i class="fas ${p.icon}"></i><span>${p.label}</span><i class="fas fa-chevron-down dd-chevron"></i></button>
@@ -50,7 +55,8 @@ function desktopItemHtml(p) {
 
 function drawerItemHtml(p) {
   if (!p.subs.length) {
-    return `<a href="${p.href}" class="drawer-link" data-page="${p.id}" data-need="${p.need || ''}"><i class="fas ${p.icon}"></i><span>${p.label}</span></a>`;
+    const linkHref = p.hash ? `${p.href}#${p.hash}` : p.href;
+    return `<a href="${linkHref}" class="drawer-link" data-page="${p.id}" data-need="${p.need || ''}"><i class="fas ${p.icon}"></i><span>${p.label}</span></a>`;
   }
   return `<div class="drawer-group" data-need="${p.need || ''}">
     <button class="drawer-link drawer-group-head" data-page="${p.id}" data-toggle-acc="${p.id}"><i class="fas ${p.icon}"></i><span>${p.label}</span><i class="fas fa-chevron-down acc-chevron"></i></button>

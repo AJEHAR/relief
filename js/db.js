@@ -379,6 +379,7 @@ export async function saveBranding(branding) {
 // minta data tarikh sama serentak (cth: nav.js checkTodayDuty() + page load).
 const _guruPageCache = {};
 const GURU_PAGE_TTL_MS = 15000;
+function clearGuruPageCache() { Object.keys(_guruPageCache).forEach(k => delete _guruPageCache[k]); }
 
 export async function getGuruPageData(dateStr) {
   const cached = _guruPageCache[dateStr];
@@ -437,7 +438,7 @@ export async function resetSection(section) {
   let count = 0;
   if (section === 'teachers') { count = await deleteAllDocsIn('teachers'); invalidateCache(); }
   else if (section === 'masterTimetable') { count = await deleteAllDocsIn('masterTimetable'); invalidateCache(); }
-  else if (section === 'dailyBoard') { count = await deleteAllDocsIn('dailyBoard'); }
+  else if (section === 'dailyBoard') { count = await deleteAllDocsIn('dailyBoard'); clearGuruPageCache(); }
   else if (section === 'reliefRecords') { count = await deleteAllDocsIn('reliefRecords'); }
   else if (section === 'logo') { await setDoc(doc(dbFs, 'settings', 'logo'), { base64: null }); count = 1; }
   else if (section === 'users') { count = await deleteAllDocsIn('users'); }
@@ -451,4 +452,115 @@ export async function resetAllOperationalData() {
   let total = 0;
   for (const s of sections) total += await resetSection(s);
   return total;
+}
+
+// ── Backup & Restore ──
+export const BACKUP_SECTIONS = [
+  { id: 'teachers', label: 'Senarai Guru' },
+  { id: 'masterTimetable', label: 'Jadual Induk' },
+  { id: 'dailyBoard', label: 'Papan Harian (semua tarikh)' },
+  { id: 'reliefRecords', label: 'Arkib' },
+  { id: 'settings', label: 'Tetapan (Masa Jadual, Logo, Jenama)' },
+  { id: 'users', label: 'Pengurusan Pengguna' },
+];
+
+export async function exportBackupData(sections) {
+  const result = { exportedAt: new Date().toISOString(), version: 1, sections: [] };
+
+  if (sections.includes('teachers')) {
+    const snap = await getDoc(doc(dbFs, 'teachers', 'data'));
+    result.teachers = snap.exists() ? snap.data() : { list: [] };
+    result.sections.push('teachers');
+  }
+  if (sections.includes('masterTimetable')) {
+    const snap = await getDoc(doc(dbFs, 'masterTimetable', 'data'));
+    result.masterTimetable = snap.exists() ? snap.data() : { rows: [] };
+    result.sections.push('masterTimetable');
+  }
+  if (sections.includes('dailyBoard')) {
+    const snap = await getDocs(collection(dbFs, 'dailyBoard'));
+    const obj = {};
+    snap.docs.forEach(d => { obj[d.id] = d.data(); });
+    result.dailyBoard = obj;
+    result.sections.push('dailyBoard');
+  }
+  if (sections.includes('reliefRecords')) {
+    const snap = await getDocs(collection(dbFs, 'reliefRecords'));
+    result.reliefRecords = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    result.sections.push('reliefRecords');
+  }
+  if (sections.includes('settings')) {
+    const [cs, logo, branding] = await Promise.all([
+      getDoc(doc(dbFs, 'settings', 'customSlots')),
+      getDoc(doc(dbFs, 'settings', 'logo')),
+      getDoc(doc(dbFs, 'settings', 'branding'))
+    ]);
+    result.settings = {
+      customSlots: cs.exists() ? cs.data() : null,
+      logo: logo.exists() ? logo.data() : null,
+      branding: branding.exists() ? branding.data() : null
+    };
+    result.sections.push('settings');
+  }
+  if (sections.includes('users')) {
+    const snap = await getDocs(collection(dbFs, 'users'));
+    result.users = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    result.sections.push('users');
+  }
+  return result;
+}
+
+async function replaceCollection(colName, itemsWithId) {
+  const existing = await getDocs(collection(dbFs, colName));
+  for (let i = 0; i < existing.docs.length; i += 400) {
+    const b = writeBatch(dbFs);
+    existing.docs.slice(i, i + 400).forEach(d => b.delete(d.ref));
+    await b.commit();
+  }
+  for (let i = 0; i < itemsWithId.length; i += 400) {
+    const b = writeBatch(dbFs);
+    itemsWithId.slice(i, i + 400).forEach(({ id, data }) => b.set(doc(dbFs, colName, id), data));
+    await b.commit();
+  }
+}
+
+/** GANTIKAN (bukan gabung) bahagian yang dipilih dengan kandungan backup. */
+export async function restoreBackupData(backup, sections) {
+  const report = {};
+
+  if (sections.includes('teachers') && backup.teachers) {
+    await setDoc(doc(dbFs, 'teachers', 'data'), backup.teachers);
+    invalidateCache();
+    report.teachers = (backup.teachers.list || []).length;
+  }
+  if (sections.includes('masterTimetable') && backup.masterTimetable) {
+    await setDoc(doc(dbFs, 'masterTimetable', 'data'), backup.masterTimetable);
+    invalidateCache();
+    report.masterTimetable = (backup.masterTimetable.rows || []).length;
+  }
+  if (sections.includes('dailyBoard') && backup.dailyBoard) {
+    const entries = Object.entries(backup.dailyBoard);
+    await replaceCollection('dailyBoard', entries.map(([id, data]) => ({ id, data })));
+    clearGuruPageCache();
+    report.dailyBoard = entries.length;
+  }
+  if (sections.includes('reliefRecords') && backup.reliefRecords) {
+    const items = backup.reliefRecords.map(r => { const { _id, ...data } = r; return { id: _id || ('R' + Date.now() + '_' + Math.random().toString(36).slice(2)), data }; });
+    await replaceCollection('reliefRecords', items);
+    report.reliefRecords = items.length;
+  }
+  if (sections.includes('settings') && backup.settings) {
+    if (backup.settings.customSlots) await setDoc(doc(dbFs, 'settings', 'customSlots'), backup.settings.customSlots);
+    if (backup.settings.logo) await setDoc(doc(dbFs, 'settings', 'logo'), backup.settings.logo);
+    if (backup.settings.branding) await setDoc(doc(dbFs, 'settings', 'branding'), backup.settings.branding);
+    _customSlotsCache = null; ssClear('customSlots');
+    _brandingCache = null; ssClear('branding');
+    report.settings = 1;
+  }
+  if (sections.includes('users') && backup.users) {
+    const items = backup.users.map(u => { const { _id, ...data } = u; return { id: _id, data }; }).filter(x => x.id);
+    await replaceCollection('users', items);
+    report.users = items.length;
+  }
+  return report;
 }

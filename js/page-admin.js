@@ -9,9 +9,10 @@ initNav();
 let pendingLogoBase64 = undefined;
 
 function switchSub(sub) {
-  ['xml', 'logo', 'pengguna', 'reset'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
+  ['xml', 'logo', 'pengguna', 'reset', 'backup'].forEach(s => $('sub-' + s).classList.toggle('hidden', s !== sub));
   if (sub === 'logo') { loadAdminLogoPreview(); loadBrandingForm(); }
   if (sub === 'pengguna') loadUserMgmt();
+  if (sub === 'backup') renderBackupSectionList();
 }
 
 // ── XML ASC ──
@@ -129,6 +130,18 @@ function logReset(msg, isError) {
   const el = $('reset-log');
   el.innerHTML = `<span style="color:${isError ? '#dc2626' : '#059669'};">${esc(msg)}</span>`;
 }
+function setBtnLoading(btn, loading, loadingText) {
+  if (loading) {
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.style.opacity = '.6';
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${esc(loadingText || 'Memproses...')}`;
+  } else {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
+  }
+}
 function wireResetButtons() {
   document.querySelectorAll('.reset-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -138,26 +151,149 @@ function wireResetButtons() {
         title: 'Padam Data', msg: `Padam "${label}"? Tindakan ini KEKAL, tiada cara nak undo. Pastikan anda memang dalam fasa testing.`,
         okLabel: 'Ya, Padam', okType: 'warn',
         onOk: async () => {
+          setBtnLoading(btn, true, 'Memadam...');
+          logReset('⏳ Sedang memadam...');
           try {
             const n = await db.resetSection(section);
-            logReset(`✅ Berjaya padam (${n} rekod terjejas) — ${label}`);
-          } catch (e) { logReset('❌ Ralat: ' + e.message, true); }
+            const msg = `✅ Berjaya padam (${n} rekod terjejas) — ${label}`;
+            logReset(msg);
+            toast(msg, 'success');
+          } catch (e) {
+            logReset('❌ Ralat: ' + e.message, true);
+            toast('Gagal padam: ' + e.message, 'error');
+          } finally {
+            setBtnLoading(btn, false);
+          }
         }
       });
     });
   });
   $('btn-reset-all').addEventListener('click', () => {
+    const btn = $('btn-reset-all');
     showConfirm({
       title: '⚠️ PADAM SEMUA DATA OPERASI',
       msg: 'Ini akan padam SEMUA: senarai guru, jadual induk, papan harian (semua tarikh), arkib, dan logo sekolah. TIDAK termasuk senarai Pengguna. Tindakan ini KEKAL. Anda pasti?',
       okLabel: 'Ya, PADAM SEMUA', okType: 'warn',
       onOk: async () => {
+        setBtnLoading(btn, true, 'Memadam semua data...');
+        logReset('⏳ Sedang memadam semua data operasi...');
         try {
           const n = await db.resetAllOperationalData();
-          logReset(`✅ Semua data operasi dipadam (${n} rekod terjejas).`);
-        } catch (e) { logReset('❌ Ralat: ' + e.message, true); }
+          const msg = `✅ Semua data operasi dipadam (${n} rekod terjejas).`;
+          logReset(msg);
+          toast(msg, 'success');
+        } catch (e) {
+          logReset('❌ Ralat: ' + e.message, true);
+          toast('Gagal padam: ' + e.message, 'error');
+        } finally {
+          setBtnLoading(btn, false);
+        }
       }
     });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// BACKUP & RESTORE
+// ═══════════════════════════════════════════════════════════
+let pendingRestoreData = null;
+
+function renderBackupSectionList() {
+  $('backup-section-list').innerHTML = db.BACKUP_SECTIONS.map(s => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--navy);">
+      <input type="checkbox" class="backup-cb" value="${esc(s.id)}" checked> ${esc(s.label)}
+    </label>`).join('');
+}
+
+function checkedValues(selector) {
+  return Array.from(document.querySelectorAll(selector + ':checked')).map(el => el.value);
+}
+
+async function doBackup() {
+  const sections = checkedValues('.backup-cb');
+  if (!sections.length) return toast('Sila pilih sekurang-kurangnya 1 bahagian.', 'error');
+  const btn = $('btn-do-backup');
+  setBtnLoading(btn, true, 'Membuat backup...');
+  $('backup-log').innerHTML = `<span style="color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Mengumpul data...</span>`;
+  try {
+    const data = await db.exportBackupData(sections);
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    a.href = url;
+    a.download = `backup-relief-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    const msg = `✅ Backup siap dimuat turun (${sections.length} bahagian: ${data.sections.join(', ')}).`;
+    $('backup-log').innerHTML = `<span style="color:var(--success);">${esc(msg)}</span>`;
+    toast('Backup berjaya dimuat turun.', 'success');
+  } catch (e) {
+    $('backup-log').innerHTML = `<span style="color:var(--danger);">❌ Ralat: ${esc(e.message)}</span>`;
+    toast('Gagal buat backup: ' + e.message, 'error');
+  } finally {
+    setBtnLoading(btn, false);
+  }
+}
+
+function wireRestoreFileInput() {
+  $('restore-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $('restore-file-name').textContent = file.name;
+    $('restore-log').innerHTML = '';
+    $('restore-section-wrap').classList.add('hidden');
+    pendingRestoreData = null;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed || !Array.isArray(parsed.sections) || !parsed.sections.length) {
+        throw new Error('Fail ni bukan fail backup yang sah (struktur tak dikenali).');
+      }
+      pendingRestoreData = parsed;
+      const available = db.BACKUP_SECTIONS.filter(s => parsed.sections.includes(s.id));
+      $('restore-section-list').innerHTML = available.map(s => `
+        <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--navy);">
+          <input type="checkbox" class="restore-cb" value="${esc(s.id)}" checked> ${esc(s.label)}
+        </label>`).join('');
+      $('restore-section-wrap').classList.remove('hidden');
+      $('restore-log').innerHTML = `<span style="color:var(--muted);">Backup dibuat: ${esc(parsed.exportedAt || '—')} · ${available.length} bahagian tersedia dalam fail ni.</span>`;
+    } catch (err) {
+      toast('Fail tidak sah: ' + err.message, 'error');
+      $('restore-log').innerHTML = `<span style="color:var(--danger);">❌ ${esc(err.message)}</span>`;
+    }
+  });
+}
+
+function doRestore() {
+  if (!pendingRestoreData) return;
+  const sections = checkedValues('.restore-cb');
+  if (!sections.length) return toast('Sila pilih sekurang-kurangnya 1 bahagian.', 'error');
+  const labels = db.BACKUP_SECTIONS.filter(s => sections.includes(s.id)).map(s => s.label).join(', ');
+  showConfirm({
+    title: '⚠️ Restore Data',
+    msg: `Ini akan GANTIKAN sepenuhnya bahagian berikut dengan kandungan fail backup: ${labels}. Data semasa bagi bahagian ni akan HILANG (digantikan). Tindakan ini KEKAL. Anda pasti?`,
+    okLabel: 'Ya, Restore', okType: 'warn',
+    onOk: async () => {
+      const btn = $('btn-do-restore');
+      setBtnLoading(btn, true, 'Sedang restore...');
+      $('restore-log').innerHTML = `<span style="color:var(--muted);"><i class="fas fa-spinner fa-spin"></i> Sedang restore data...</span>`;
+      try {
+        const report = await db.restoreBackupData(pendingRestoreData, sections);
+        const summary = Object.entries(report).map(([k, v]) => `${k}: ${v}`).join(', ');
+        const msg = `✅ Restore siap — ${summary}.`;
+        $('restore-log').innerHTML = `<span style="color:var(--success);">${esc(msg)}</span>`;
+        toast('Restore berjaya.', 'success');
+      } catch (e) {
+        $('restore-log').innerHTML = `<span style="color:var(--danger);">❌ Ralat: ${esc(e.message)}</span>`;
+        toast('Gagal restore: ' + e.message, 'error');
+      } finally {
+        setBtnLoading(btn, false);
+      }
+    }
   });
 }
 
@@ -168,6 +304,9 @@ gatePage('admin', async () => {
   $('btn-remove-logo').addEventListener('click', removeLogoAction);
   $('btn-save-branding').addEventListener('click', saveBrandingAction);
   wireResetButtons();
+  $('btn-do-backup').addEventListener('click', doBackup);
+  wireRestoreFileInput();
+  $('btn-do-restore').addEventListener('click', doRestore);
   switchSub(initialSub('xml'));
   window.addEventListener('hashchange', () => switchSub(initialSub('xml')));
 });
