@@ -3,7 +3,7 @@ import { authState, setMyTeacherId } from './auth.js';
 import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, escJs, escRx, todayStr, setBanner, toast, skeletonTimetableRows } from './ui-utils.js';
+import { $, esc, escJs, escRx, todayStr, setBanner, toast, skeletonTimetableRows, slugify } from './ui-utils.js';
 
 initNav();
 
@@ -171,7 +171,7 @@ async function printSaya() {
   const html = `<div class="pdf-title">Jadual Hari Ini — ${esc(selT.name)}</div>
     <div class="pdf-sub">${esc(board.dayName || '')} · ${esc(getDate())}${!board.published ? ' · (Draf, belum disahkan)' : ''}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Status</th><th>Butiran</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await writePrintWindow(win, html, `Jadual Saya - ${selT.name} - ${getDate()}`);
+  await writePrintWindow(win, html, `Jadual-Saya_${slugify(selT.name)}_${getDate()}`);
 }
 
 function changeTeacher() {
@@ -363,7 +363,7 @@ async function printKelas() {
   const html = `<div class="pdf-title">Jadual Kelas — ${esc(selKelas)}</div>
     <div class="pdf-sub">${esc(board.dayName || '')} · ${esc(getDate())}${!board.published ? ' · (Draf, belum disahkan)' : ''}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Status</th><th>Butiran</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await writePrintWindow(win, html, `Jadual Kelas - ${selKelas} - ${getDate()}`);
+  await writePrintWindow(win, html, `Jadual-Kelas_${slugify(selKelas)}_${getDate()}`);
 }
 
 gatePage('login', async () => {

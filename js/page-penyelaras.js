@@ -365,7 +365,7 @@ async function generatePdf() {
   const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(currentBoard.dayName || '')}</div>
     <div class="pdf-sub">${esc(getDate())}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await writePrintWindow(win, html, `Jadual Guru Ganti ${getDate()}`);
+  await writePrintWindow(win, html, `Jadual-Induk_${getDate()}`);
 
   // Jana PDF turut auto-sahkan tapak (elak pentadbir lupa tekan "Sahkan Tapak")
   if (!wasConfirmed) {
@@ -504,7 +504,7 @@ async function printArchive() {
   let rows = records.map(r => `<tr><td>${esc(r.period)}</td><td>${esc(r.time)}</td><td>${esc(r.className)}</td><td>${esc(r.subject)}</td><td>${esc(r.absentTeacher)}</td><td class="green">${esc(r.reliefTeacher)}</td><td>${esc(r.note) || ''}</td></tr>`).join('');
   const html = `<div class="pdf-title">Arkib Guru Ganti</div><div class="pdf-sub">${esc(getDate())}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await writePrintWindow(win, html, `Arkib Guru Ganti ${getDate()}`);
+  await writePrintWindow(win, html, `Arkib-Guru-Ganti_${getDate()}`);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -554,7 +554,7 @@ async function generateRangeReport() {
     const html = `<div class="pdf-title">Laporan Guru Ganti</div>
       <div class="pdf-sub">${esc(start)} hingga ${esc(end)} · ${records.length} tugasan merentas ${dates.length} hari</div>
       ${body}`;
-    await writePrintWindow(win, html, `Laporan_Guru_Ganti_${start}_${end}`);
+    await writePrintWindow(win, html, `Laporan-Guru-Ganti_${start}_hingga_${end}`);
     $('range-report-msg').innerHTML = `<span style="color:var(--success);">✅ Laporan dijana (${records.length} tugasan, ${dates.length} hari).</span>`;
   } catch (e) {
     win.close();

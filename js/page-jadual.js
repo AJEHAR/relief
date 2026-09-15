@@ -25,7 +25,7 @@ async function printInduk() {
   const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(guruBoard.dayName || '')}</div>
     <div class="pdf-sub">${esc(getDate())}${!guruBoard.published ? ' · (Draf, belum disahkan)' : ''}</div>
     <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Tidak Hadir</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await writePrintWindow(win, html, `Jadual Guru Ganti ${getDate()}`);
+  await writePrintWindow(win, html, `Jadual-Ganti_${getDate()}`);
 }
 
 async function loadInduk() {

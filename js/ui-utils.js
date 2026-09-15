@@ -19,6 +19,11 @@ export function reasonClass(reason) {
   return 'reason-lain';
 }
 
+/** Tukar teks jadi selamat guna dalam nama fail (buang ruang/aksara pelik) */
+export function slugify(text) {
+  return String(text || '').trim().replace(/\s+/g, '-').replace(/[^\w\-]/g, '');
+}
+
 // ── Skeleton generators — bentuk mengikut kandungan sebenar (kad berkumpulan,
 // jadual, grid) supaya peralihan ke data sebenar tak "melompat" ── 
 export function skeletonGroupedList(groups = 2, rowsPerGroup = 3) {
