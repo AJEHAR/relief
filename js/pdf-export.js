@@ -4,6 +4,9 @@
 // boleh pilih "Save as PDF" atau hantar terus ke pencetak.
 // ═══════════════════════════════════════════════════════════
 import { getLogo } from './db.js';
+import { qrcode } from './qrcode-lib.js';
+
+const SITE_URL = 'https://relief.syazr.com';
 
 const PRINT_CSS = `
   * { box-sizing:border-box; }
@@ -17,11 +20,37 @@ const PRINT_CSS = `
   .pdf-header img { width:42pt; height:42pt; object-fit:contain; }
   .pdf-title { font-size:16pt; font-weight:800; color:#0f2044; margin-bottom:4pt; }
   .pdf-sub { font-size:10pt; color:#6b7c9e; margin-bottom:16pt; }
+  .pdf-footer { display:flex; align-items:center; gap:10pt; margin-top:22pt; padding-top:10pt; border-top:0.5pt solid #e2e8f0; }
+  .pdf-footer svg { width:52pt; height:52pt; flex-shrink:0; }
+  .pdf-footer-text { font-size:8pt; color:#6b7c9e; line-height:1.5; }
+  .pdf-footer-text b { color:#1e2d4a; }
   @media print {
     body { margin:0; }
     @page { margin: 14mm; }
+    .pdf-footer { break-inside:avoid; }
   }
 `;
+
+/** Bina blok footer (QR + link) yang disisipkan pada hujung setiap PDF. */
+function buildFooterHtml() {
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(SITE_URL);
+    qr.make();
+    const svg = qr.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+    return `<div class="pdf-footer">
+      ${svg}
+      <div class="pdf-footer-text">
+        <b>Sistem Guru Ganti az=R</b><br>
+        Imbas kod QR atau layari:<br>
+        ${SITE_URL}
+      </div>
+    </div>`;
+  } catch (e) {
+    // QR pilihan sahaja — jangan gagalkan cetakan jika ada masalah tak dijangka
+    return `<div class="pdf-footer"><div class="pdf-footer-text"><b>Sistem Guru Ganti az=R</b> — ${SITE_URL}</div></div>`;
+  }
+}
 
 /**
  * Buka tetingkap cetak BARU serta-merta (synchronous, sebelum sebarang await)
@@ -43,8 +72,10 @@ export async function writePrintWindow(win, htmlContent, title) {
     if (logo) logoHtml = `<div class="pdf-header"><img src="${logo}" alt="Logo"></div>`;
   } catch (e) { /* logo pilihan sahaja, jangan gagalkan cetakan */ }
 
+  const footerHtml = buildFooterHtml();
+
   const fullHtml = `<!doctype html><html lang="ms"><head><meta charset="utf-8"><title>${title}</title>
-    <style>${PRINT_CSS}</style></head><body>${logoHtml}${htmlContent}
+    <style>${PRINT_CSS}</style></head><body>${logoHtml}${htmlContent}${footerHtml}
     <script>window.onload=function(){setTimeout(function(){window.focus();window.print();},250);};</script>
     </body></html>`;
 
