@@ -168,7 +168,7 @@ function renderTimetableGrid() {
   statBar.style.display = 'flex';
 
   const reliefDutyMap = {};
-  const reliefDutyClassMap = {}; // reliefName -> periodId -> className (elak scan berulang setiap sel)
+  const reliefDutyClassMap = {}; // reliefName -> periodId -> [className, ...] (sokong >1 kelas dlm 1 waktu — override)
   Object.entries(board.assignments || {}).forEach(([key, val]) => {
     const reliefName = getReliefFromAssignment(val).relief;
     if (!reliefName) return;
@@ -177,7 +177,8 @@ function renderTimetableGrid() {
     if (!reliefDutyMap[reliefName]) reliefDutyMap[reliefName] = new Set();
     reliefDutyMap[reliefName].add(periodId);
     if (!reliefDutyClassMap[reliefName]) reliefDutyClassMap[reliefName] = {};
-    reliefDutyClassMap[reliefName][periodId] = className;
+    if (!reliefDutyClassMap[reliefName][periodId]) reliefDutyClassMap[reliefName][periodId] = [];
+    reliefDutyClassMap[reliefName][periodId].push(className);
   });
 
   let html = '<table class="tt-table"><thead><tr class="tt-head-row">';
@@ -206,8 +207,9 @@ function renderTimetableGrid() {
 
       if (!cells.length) {
         if (isOnReliefDuty) {
-          const dutyClassName = reliefDutyClassMap[g.name]?.[String(p.id)] || '?';
-          html += `<td class="tt-slot s-relief-duty"><div class="tt-slot-inner"><div class="tt-slot-subj">📌 Relief</div><div class="tt-slot-duty-badge"><i class="fas fa-arrow-right" style="font-size:.4rem;"></i>${esc(dutyClassName)}</div></div></td>`;
+          const dutyClasses = reliefDutyClassMap[g.name]?.[String(p.id)] || ['?'];
+          const dutyHtml = dutyClasses.map((dc, i) => `<div style="${i > 0 ? 'margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,.4);' : ''}"><div class="tt-slot-subj">📌 Relief</div><div class="tt-slot-duty-badge"><i class="fas fa-arrow-right" style="font-size:.4rem;"></i>${esc(dc)}</div></div>`).join('');
+          html += `<td class="tt-slot s-relief-duty"><div class="tt-slot-inner">${dutyHtml}</div></td>`;
         } else {
           html += `<td class="tt-slot s-empty"><div class="tt-slot-inner"></div></td>`;
         }
@@ -218,8 +220,9 @@ function renderTimetableGrid() {
       if (!isAbsent) {
         const isOverride = reliefDutyMap[g.name]?.has(String(p.id));
         if (isOverride) {
-          const dutyClass = reliefDutyClassMap[g.name]?.[String(p.id)] || '?';
-          html += `<td class="tt-slot s-override"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div><div class="tt-slot-override-badge">⚠️ +Relief ${esc(dutyClass)}</div></div></td>`;
+          const dutyClasses = reliefDutyClassMap[g.name]?.[String(p.id)] || ['?'];
+          const badgeHtml = dutyClasses.map((dc, i) => `<div class="tt-slot-override-badge" style="${i > 0 ? 'margin-top:2px;' : ''}">⚠️ +Relief ${esc(dc)}</div>`).join('');
+          html += `<td class="tt-slot s-override"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div>${badgeHtml}</div></td>`;
         } else {
           html += `<td class="tt-slot s-normal"><div class="tt-slot-inner"><div class="tt-slot-subj">${esc(cell.subject)}</div><div class="tt-slot-class">${esc(cell.className)}</div></div></td>`;
         }

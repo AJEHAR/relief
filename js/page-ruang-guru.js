@@ -77,8 +77,13 @@ function renderPersonalTimetable(ct, board) {
   const myRelief = reliefDuties[selT.name] || [];
   let mySlots = {};
   if (board.teacherMap && board.teacherMap[selT.id]) mySlots = board.teacherMap[selT.id];
+  // Array per waktu (bukan 1 nilai) — sokong >1 kelas ganti dalam waktu yang sama
   const reliefByPeriod = {};
-  myRelief.forEach(d => { reliefByPeriod[String(d.period)] = d; });
+  myRelief.forEach(d => {
+    const pid = String(d.period);
+    if (!reliefByPeriod[pid]) reliefByPeriod[pid] = [];
+    reliefByPeriod[pid].push(d);
+  });
 
   let cTeach = 0, cRelief = 0, cOverride = 0, cFree = 0, rows = '';
   periods.forEach(p => {
@@ -90,17 +95,18 @@ function renderPersonalTimetable(ct, board) {
     const pid = String(p.id);
     const normals = mySlots[pid] || [];
     const hasClass = normals.length > 0;
-    const hasRelief = !!reliefByPeriod[pid];
-    const relief = reliefByPeriod[pid] || {};
+    const reliefList = reliefByPeriod[pid] || [];
+    const hasRelief = reliefList.length > 0;
     let rowClass, chipHtml, mainHtml;
 
     if (hasClass && hasRelief) {
       rowClass = 'row-override'; cOverride++;
-      chipHtml = `<span class="slot-chip chip-override"><i class="fas fa-exclamation-triangle" style="font-size:.6rem;"></i> Mengajar + Ganti</span>`;
+      chipHtml = `<span class="slot-chip chip-override"><i class="fas fa-exclamation-triangle" style="font-size:.6rem;"></i> Mengajar + Ganti${reliefList.length > 1 ? ` (${reliefList.length})` : ''}</span>`;
       const classLines = normals.map(n => `<div class="slot-main-text">${esc(n.className)}</div><div class="slot-sub-text">${esc(n.subject) || '—'}</div>`).join('');
-      mainHtml = `${classLines}<div class="slot-override-alert"><i class="fas fa-user-slash" style="font-size:.7rem;flex-shrink:0;"></i>
+      const reliefBlocks = reliefList.map((relief, i) => `<div class="slot-override-alert" style="${i > 0 ? 'margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;' : ''}"><i class="fas fa-user-slash" style="font-size:.7rem;flex-shrink:0;"></i>
         <span>Ganti: <strong>${esc(relief.className)}</strong> · ${esc(relief.subject) || '—'} <span style="opacity:.7;">(menggantikan ${esc(relief.absentTeacher) || '?'})</span></span></div>
-        ${relief.note ? `<div class="note-box"><i class="fas fa-sticky-note"></i>${esc(relief.note)}</div>` : ''}`;
+        ${relief.note ? `<div class="note-box"><i class="fas fa-sticky-note"></i>${esc(relief.note)}</div>` : ''}`).join('');
+      mainHtml = `${classLines}${reliefBlocks}`;
     } else if (hasClass && !hasRelief) {
       rowClass = 'row-normal'; cTeach++;
       chipHtml = `<span class="slot-chip chip-normal"><i class="fas fa-chalkboard" style="font-size:.6rem;"></i> Mengajar</span>`;
@@ -112,10 +118,11 @@ function renderPersonalTimetable(ct, board) {
       }
     } else if (!hasClass && hasRelief) {
       rowClass = 'row-relief'; cRelief++;
-      chipHtml = `<span class="slot-chip chip-relief"><i class="fas fa-user-check" style="font-size:.6rem;"></i> Guru Ganti</span>`;
-      mainHtml = `<div class="slot-main-text">${esc(relief.className)}</div><div class="slot-sub-text">${esc(relief.subject) || '—'}</div>
+      chipHtml = `<span class="slot-chip chip-relief"><i class="fas fa-user-check" style="font-size:.6rem;"></i> Guru Ganti${reliefList.length > 1 ? ` (${reliefList.length})` : ''}</span>`;
+      mainHtml = reliefList.map((relief, i) => `<div style="${i > 0 ? 'margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;' : ''}">
+        <div class="slot-main-text">${esc(relief.className)}</div><div class="slot-sub-text">${esc(relief.subject) || '—'}</div>
         <div class="slot-relief-text"><i class="fas fa-user-slash" style="font-size:.65rem;"></i> Menggantikan ${esc(relief.absentTeacher) || '?'}</div>
-        ${relief.note ? `<div class="note-box"><i class="fas fa-sticky-note"></i>${esc(relief.note)}</div>` : ''}`;
+        ${relief.note ? `<div class="note-box"><i class="fas fa-sticky-note"></i>${esc(relief.note)}</div>` : ''}</div>`).join('');
     } else {
       rowClass = 'row-free'; cFree++;
       chipHtml = `<span class="slot-chip chip-free"><i class="fas fa-check" style="font-size:.6rem;"></i> Lapang</span>`;
@@ -153,18 +160,22 @@ async function printSaya() {
   const myRelief = reliefDuties[selT.name] || [];
   const mySlots = (board.teacherMap && board.teacherMap[selT.id]) || {};
   const reliefByPeriod = {};
-  myRelief.forEach(d => { reliefByPeriod[String(d.period)] = d; });
+  myRelief.forEach(d => {
+    const pid = String(d.period);
+    if (!reliefByPeriod[pid]) reliefByPeriod[pid] = [];
+    reliefByPeriod[pid].push(d);
+  });
 
   let rows = '';
   periods.forEach(p => {
     if (p.isRehat) { rows += `<tr><td>${esc(p.label || 'Rehat')}</td><td>${esc(p.start)}–${esc(p.end)}</td><td colspan="2">—</td></tr>`; return; }
     const pid = String(p.id);
     const normals = mySlots[pid] || [];
-    const relief = reliefByPeriod[pid];
+    const reliefList = reliefByPeriod[pid] || [];
     let statusTxt, classTxt;
-    if (normals.length && relief) { statusTxt = 'Mengajar + Ganti'; classTxt = `${normals.map(n => n.className).join(', ')} / Ganti: ${relief.className}`; }
+    if (normals.length && reliefList.length) { statusTxt = 'Mengajar + Ganti'; classTxt = `${normals.map(n => n.className).join(', ')} / Ganti: ${reliefList.map(r => r.className).join(', ')}`; }
     else if (normals.length) { statusTxt = 'Mengajar'; classTxt = normals.map(n => `${n.className} (${n.subject || '—'})`).join(', '); }
-    else if (relief) { statusTxt = 'Guru Ganti'; classTxt = `${relief.className} (${relief.subject || '—'}) — ganti ${relief.absentTeacher || '?'}`; }
+    else if (reliefList.length) { statusTxt = 'Guru Ganti'; classTxt = reliefList.map(r => `${r.className} (${r.subject || '—'}) — ganti ${r.absentTeacher || '?'}`).join('; '); }
     else { statusTxt = 'Lapang'; classTxt = '—'; }
     rows += `<tr><td>${esc(pid)}</td><td>${esc(p.start)}–${esc(p.end)}</td><td>${esc(statusTxt)}</td><td>${esc(classTxt)}</td></tr>`;
   });
@@ -261,9 +272,15 @@ function renderClassTimetable(ct, board) {
       });
     });
   }
+  // Array per waktu — sokong >1 guru ganti utk kelas+waktu sama (cth team-teaching, 2 guru tidak hadir serentak)
   const classRelief = {};
   Object.entries(rd).forEach(([rn, duties]) => {
-    duties.forEach(d => { if (d.className === selKelas) classRelief[String(d.period)] = { reliefName: rn, absentTeacher: d.absentTeacher || '', subject: d.subject || '', note: d.note || '' }; });
+    duties.forEach(d => {
+      if (d.className !== selKelas) return;
+      const pid = String(d.period);
+      if (!classRelief[pid]) classRelief[pid] = [];
+      classRelief[pid].push({ reliefName: rn, absentTeacher: d.absentTeacher || '', subject: d.subject || '', note: d.note || '' });
+    });
   });
 
   let cNormal = 0, cGanti = 0, cFree = 0, rows = '';
@@ -275,18 +292,19 @@ function renderClassTimetable(ct, board) {
     }
     const pid = String(p.id);
     const scheds = classSchedule[pid] || [];
-    const relief = classRelief[pid];
+    const reliefList = classRelief[pid] || [];
     let rowClass, chipHtml, mainHtml;
-    if (scheds.length > 0 && relief) {
+    if (scheds.length > 0 && reliefList.length > 0) {
       cGanti++; rowClass = 'row-relief';
-      chipHtml = `<span class="slot-chip chip-kelas-ganti"><i class="fas fa-user-check" style="font-size:.6rem;"></i> Guru Ganti</span>`;
-      mainHtml = `<div class="slot-main-text">${esc(relief.subject || scheds[0].subject)}</div>
+      chipHtml = `<span class="slot-chip chip-kelas-ganti"><i class="fas fa-user-check" style="font-size:.6rem;"></i> Guru Ganti${reliefList.length > 1 ? ` (${reliefList.length})` : ''}</span>`;
+      mainHtml = reliefList.map((relief, i) => `<div style="${i > 0 ? 'margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0;' : ''}">
+        <div class="slot-main-text">${esc(relief.subject || scheds[0].subject)}</div>
         <div class="slot-ganti-text"><i class="fas fa-user-check" style="font-size:.65rem;"></i>${esc(relief.reliefName)}</div>
         <div style="font-size:.68rem;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:4px;">
           <i class="fas fa-user-slash" style="font-size:.6rem;color:var(--danger);"></i>
           <span>${scheds.map(s => esc(s.teacherName)).join(', ')} <span style="opacity:.6;">(tidak hadir)</span></span></div>
-        ${relief.note ? `<div class="note-box"><i class="fas fa-sticky-note"></i>${esc(relief.note)}</div>` : ''}`;
-    } else if (scheds.length > 0 && !relief) {
+        ${relief.note ? `<div class="note-box"><i class="fas fa-sticky-note"></i>${esc(relief.note)}</div>` : ''}</div>`).join('');
+    } else if (scheds.length > 0 && !reliefList.length) {
       cNormal++; rowClass = 'row-normal';
       chipHtml = `<span class="slot-chip chip-normal"><i class="fas fa-chalkboard" style="font-size:.6rem;"></i> Kelas Biasa</span>`;
       if (scheds.length === 1) {
@@ -345,7 +363,12 @@ async function printKelas() {
   }
   const classRelief = {};
   Object.entries(rd).forEach(([rn, duties]) => {
-    duties.forEach(d => { if (d.className === selKelas) classRelief[String(d.period)] = { reliefName: rn, absentTeacher: d.absentTeacher || '', subject: d.subject || '' }; });
+    duties.forEach(d => {
+      if (d.className !== selKelas) return;
+      const pid = String(d.period);
+      if (!classRelief[pid]) classRelief[pid] = [];
+      classRelief[pid].push({ reliefName: rn, absentTeacher: d.absentTeacher || '', subject: d.subject || '' });
+    });
   });
 
   let rows = '';
@@ -353,9 +376,9 @@ async function printKelas() {
     if (p.isRehat) { rows += `<tr><td>${esc(p.label || 'Rehat')}</td><td>${esc(p.start)}–${esc(p.end)}</td><td colspan="2">—</td></tr>`; return; }
     const pid = String(p.id);
     const scheds = classSchedule[pid] || [];
-    const relief = classRelief[pid];
+    const reliefList = classRelief[pid] || [];
     let statusTxt, detailTxt;
-    if (scheds.length && relief) { statusTxt = 'Guru Ganti'; detailTxt = `${relief.subject || scheds[0].subject} — ${relief.reliefName} (ganti ${scheds.map(s => s.teacherName).join(', ')})`; }
+    if (scheds.length && reliefList.length) { statusTxt = 'Guru Ganti'; detailTxt = reliefList.map(relief => `${relief.subject || scheds[0].subject} — ${relief.reliefName} (ganti ${scheds.map(s => s.teacherName).join(', ')})`).join('; '); }
     else if (scheds.length) { statusTxt = 'Kelas Biasa'; detailTxt = scheds.map(s => `${s.subject || '—'} (${s.teacherName})`).join(', '); }
     else { statusTxt = 'Tiada Kelas'; detailTxt = '—'; }
     rows += `<tr><td>${esc(pid)}</td><td>${esc(p.start)}–${esc(p.end)}</td><td>${esc(statusTxt)}</td><td>${esc(detailTxt)}</td></tr>`;
