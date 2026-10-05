@@ -24,6 +24,27 @@ export function slugify(text) {
   return String(text || '').trim().replace(/\s+/g, '-').replace(/[^\w\-]/g, '');
 }
 
+/** Buang aksara haram nama fail sahaja — KEKALKAN ruang & sempang (format
+ * "HARI - TARIKH - JADUAL GURU GANTI - SUBTAJUK" perlukan ruang tulen). */
+export function sanitizeFilename(text) {
+  return String(text || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** "2026-10-05" (input date picker, ISO) → "05-10-2026" */
+export function formatDateDMY(isoDate) {
+  const parts = String(isoDate || '').split('-');
+  if (parts.length !== 3) return isoDate || '';
+  const [y, m, d] = parts;
+  return `${d}-${m}-${y}`;
+}
+
+/** Bina nama fail PDF standard: "HARI - TARIKH - JADUAL GURU GANTI - SUBTAJUK" */
+export function buildPdfFilename(dayName, isoDate, subtitle) {
+  const parts = [String(dayName || '').toUpperCase(), formatDateDMY(isoDate), 'JADUAL GURU GANTI'];
+  if (subtitle) parts.push(String(subtitle).toUpperCase());
+  return sanitizeFilename(parts.join(' - '));
+}
+
 // ── Skeleton generators — bentuk mengikut kandungan sebenar (kad berkumpulan,
 // jadual, grid) supaya peralihan ke data sebenar tak "melompat" ── 
 export function skeletonGroupedList(groups = 2, rowsPerGroup = 3) {

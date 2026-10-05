@@ -2,7 +2,7 @@ import { initNav, gatePage } from './nav.js';
 import { onAuthChange, isLoggedIn } from './auth.js';
 import * as db from './db.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, todayStr, setBanner, toast, skeletonGroupedList, skeletonTable, reasonClass } from './ui-utils.js';
+import { $, esc, todayStr, setBanner, toast, skeletonGroupedList, reasonClass, buildPdfFilename } from './ui-utils.js';
 
 initNav();
 
@@ -10,27 +10,52 @@ let guruBoard = null;
 
 function getDate() { return $('datePicker').value; }
 
+const REASON_PRINT_COLOR = { 'Urusan Rasmi': '#1d4ed8', 'Cuti': '#047857', 'Keluar Waktu Bekerja': '#c2410c' };
+
 async function printInduk() {
   if (!guruBoard) return;
   const win = openPrintWindow();
   const rd = guruBoard.reliefDuties || {};
   const all = [];
   Object.entries(rd).forEach(([rn, ds]) => ds.forEach(d => all.push({ ...d, reliefName: rn })));
-  all.sort((a, b) => {
+
+  // Kumpulkan ikut guru TIDAK HADIR — sama logik dgn paparan skrin
+  const byAbsent = {};
+  all.forEach(d => {
+    const key = d.absentTeacher || 'Tiada Nama';
+    if (!byAbsent[key]) byAbsent[key] = { reason: d.absentReason || '', slots: [] };
+    byAbsent[key].slots.push(d);
+  });
+  Object.values(byAbsent).forEach(g => g.slots.sort((a, b) => {
     const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
     return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
-  });
-  const rows = all.map(d => `<tr><td>${esc(d.period)}</td><td>${esc(d.time)}</td><td>${esc(d.className)}</td><td>${esc(d.subject) || '—'}</td>
-    <td class="green">${esc(d.reliefName)}</td><td>${esc(d.absentTeacher) || '—'}</td><td>${esc(d.note) || ''}</td></tr>`).join('');
+  }));
+  const absentNames = Object.keys(byAbsent).sort((a, b) => a.localeCompare(b));
+
+  const groups = absentNames.map(name => {
+    const g = byAbsent[name];
+    const color = REASON_PRINT_COLOR[g.reason] || '#334155';
+    const rows = g.slots.map(d => `<tr><td>${esc(d.period)}</td><td>${esc(d.time)}</td><td>${esc(d.className)}</td><td>${esc(d.subject) || '—'}</td>
+      <td class="green">${esc(d.reliefName)}</td><td>${esc(d.note) || ''}</td></tr>`).join('');
+    return `<div class="pdf-group">
+      <div class="pdf-group-head" style="color:${color};border-color:${color};">
+        ${esc(name)}${g.reason ? ` <span class="pdf-group-reason" style="background:${color};">${esc(g.reason)}</span>` : ''}
+        <span class="pdf-group-count">· ${g.slots.length} slot</span>
+      </div>
+      <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }).join('');
+
   const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(guruBoard.dayName || '')}</div>
     <div class="pdf-sub">${esc(getDate())}${!guruBoard.published ? ' · (Draf, belum disahkan)' : ''}</div>
-    <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Tidak Hadir</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await writePrintWindow(win, html, `Jadual-Ganti_${getDate()}`);
+    ${groups}`;
+  const branding = await db.getBranding();
+  const filename = buildPdfFilename(guruBoard.dayName, getDate(), branding.subtitle);
+  await writePrintWindow(win, html, filename);
 }
 
 async function loadInduk() {
-  const isDesktop = window.matchMedia('(min-width:900px)').matches;
-  $('induk-content').innerHTML = isDesktop ? skeletonTable(6) : skeletonGroupedList(2, 3);
+  $('induk-content').innerHTML = skeletonGroupedList(2, 3);
   try {
     const res = await db.getGuruPageData(getDate());
     guruBoard = res.board;
@@ -88,27 +113,8 @@ function renderInduk() {
       <div class="card-head"><div class="card-head-icon" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);"><i class="fas fa-list-alt"></i></div>
         <div><div class="card-head-title">Senarai Lengkap Guru Ganti</div><div class="card-head-sub">${esc(board.dayName || '')} · ${all.length} tugasan · ${rCount} guru</div></div></div>`;
 
-  // ── Versi DESKTOP: jadual 7-lajur asal ──
-  const allSorted = [...all].sort((a, b) => {
-    const ai = parseInt(a.period, 10), bi = parseInt(b.period, 10);
-    return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.period).localeCompare(String(b.period));
-  });
-  h += `<div class="desktop-table-view"><div class="table-wrap"><table class="m-table"><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Tidak Hadir</th><th>Catatan</th></tr></thead><tbody>`;
-  allSorted.forEach(d => {
-    h += `<tr>
-      <td><span class="p-pill">${esc(d.period)}</span></td>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);white-space:nowrap;">${esc(d.time)}</td>
-      <td><span class="c-pill">${esc(d.className)}</span></td>
-      <td style="font-weight:700;font-size:.82rem;">${esc(d.subject) || '—'}</td>
-      <td style="font-weight:800;color:var(--navy);">${esc(d.reliefName)}</td>
-      <td style="color:var(--muted);">${esc(d.absentTeacher) || '—'}</td>
-      <td style="min-width:130px;">${d.note ? `<div class="note-chip"><i class="fas fa-sticky-note"></i>${esc(d.note)}</div>` : '<span style="color:#cbd5e1;font-size:.7rem;">—</span>'}</td>
-    </tr>`;
-  });
-  h += `</tbody></table></div></div>`;
-
-  // ── Versi MOBILE/TABLET: dikumpulkan ikut guru tidak hadir ──
-  h += `<div class="mobile-grouped-view"><div class="grp-list">`;
+  // ── Dikumpulkan ikut guru tidak hadir — SAMA untuk desktop & mobile ──
+  h += `<div class="jg-grouped-view"><div class="grp-list">`;
   absentNames.forEach(name => {
     const g = byAbsent[name];
     h += `<div class="grp-card"><div class="grp-head"><div class="grp-av">${esc(getInitials(name))}</div>

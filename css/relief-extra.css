@@ -225,7 +225,9 @@
 /* ═══════════════════════════════════════════════════
    SENARAI GURU GANTI — dikumpulkan ikut guru tidak hadir
    ═══════════════════════════════════════════════════ */
-.grp-list{display:flex;flex-direction:column;gap:14px;padding:14px;background:#eef1f6;}
+.grp-list{display:grid;grid-template-columns:1fr;gap:14px;padding:14px;background:#eef1f6;align-items:start;}
+@media (min-width:720px){ .grp-list{grid-template-columns:repeat(2,1fr);} }
+@media (min-width:1180px){ .grp-list{grid-template-columns:repeat(3,1fr);} }
 .grp-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;overflow:hidden;}
 .grp-head{display:flex;align-items:center;gap:10px;padding:14px 16px;background:#f8fafc;}
 .grp-av{width:34px;height:34px;border-radius:50%;background:#fef2f2;color:#b91c1c;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.7rem;flex-shrink:0;}
@@ -257,7 +259,9 @@
 .tt-slot-subj{font-size:.58rem;}
 .tt-slot-class{font-size:.52rem;}
 
-/* Desktop = jadual 7-lajur asal; Mobile/tablet = grouping baru */
+/* Desktop = jadual 7-lajur asal; Mobile/tablet = grouping baru.
+   (Guna di Sejarah — js/page-penyelaras.js. Jadual Ganti/index.html guna
+   .grp-list terus tanpa toggle ni — rujuk blok "JADUAL GANTI" di bawah.) */
 .desktop-table-view{display:none;}
 .mobile-grouped-view{display:block;}
 @media (min-width:900px){
@@ -271,3 +275,10 @@
   .date-row{flex-direction:column;align-items:stretch;}
   .date-row > *{width:100%;margin-left:0 !important;justify-content:center;}
 }
+
+/* ═══════════════════════════════════════════════════
+   JADUAL GANTI (index.html) — paparan dikumpulkan ikut guru
+   tidak hadir SAMA pada desktop & mobile (jadual 7-lajur
+   lama dibuang terus, tiada toggle ikut saiz skrin).
+   ═══════════════════════════════════════════════════ */
+.jg-grouped-view{display:block;}

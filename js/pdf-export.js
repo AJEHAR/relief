@@ -24,10 +24,17 @@ const PRINT_CSS = `
   .pdf-footer svg { width:52pt; height:52pt; flex-shrink:0; }
   .pdf-footer-text { font-size:8pt; color:#6b7c9e; line-height:1.5; }
   .pdf-footer-text b { color:#1e2d4a; }
+  .pdf-group { margin-bottom:14pt; }
+  .pdf-group-head { font-size:11pt; font-weight:800; padding-bottom:4pt; margin-bottom:6pt; border-bottom:1.5pt solid; }
+  .pdf-group-reason { color:#fff !important; font-size:7pt; font-weight:700; text-transform:uppercase; border-radius:4pt; padding:1.5pt 6pt; margin-left:4pt; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .pdf-group-count { font-size:8.5pt; font-weight:600; color:#6b7c9e; }
+  .pdf-group table { margin-bottom:0; }
   @media print {
     body { margin:0; }
     @page { margin: 14mm; }
     .pdf-footer { break-inside:avoid; }
+    .pdf-group { break-inside:avoid; }
+    .pdf-group-head { break-after:avoid; }
   }
 `;
 

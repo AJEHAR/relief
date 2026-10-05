@@ -3,7 +3,9 @@ import * as db from './db.js';
 import { loadStaticLists } from './shared-data.js';
 import { getReliefFromAssignment } from './board-engine.js';
 import { openPrintWindow, writePrintWindow } from './pdf-export.js';
-import { $, esc, escJs, todayStr, toast, showConfirm, skeletonGroupedList, skeletonTable, skeletonGrid, skeletonRows, reasonClass } from './ui-utils.js';
+import { $, esc, escJs, todayStr, toast, showConfirm, skeletonGroupedList, skeletonTable, skeletonGrid, skeletonRows, reasonClass, buildPdfFilename } from './ui-utils.js';
+
+const REASON_PRINT_COLOR = { 'Urusan Rasmi': '#1d4ed8', 'Cuti': '#047857', 'Keluar Waktu Bekerja': '#c2410c' };
 
 initNav();
 
@@ -353,22 +355,42 @@ async function generatePdf() {
   const win = openPrintWindow();
   const wasConfirmed = currentBoard.status === 'confirmed';
   const ids = currentBoard.absentIds || [];
-  let rows = '';
-  ids.forEach(tid => {
+
+  // Dikumpulkan ikut guru TIDAK HADIR — sama gaya dgn Jadual Ganti (awam),
+  // tapi kekal tunjuk slot BELUM DITETAPKAN (admin perlu nampak status penuh).
+  const groups = ids.map(tid => {
     const t = teachersList.find(x => x.id === tid) || { name: tid };
+    const reason = (currentBoard.absentReasons || {})[tid] || '';
+    const color = REASON_PRINT_COLOR[reason] || '#334155';
     const slotsByPeriod = currentBoard.teacherMap?.[tid] || {};
+    let slots = [];
     Object.keys(slotsByPeriod).filter(k => k !== 'name' && k !== 'id').forEach(pid => {
       (slotsByPeriod[pid] || []).forEach(slot => {
         const period = (currentBoard.periods || []).find(p => p.id === pid) || {};
-        rows += `<tr><td>${esc(pid)}</td><td>${esc(period.start || '')}–${esc(period.end || '')}</td><td>${esc(slot.className)}</td><td>${esc(slot.subject) || '—'}</td>
-          <td>${esc(t.name)}</td><td class="${slot.reliefTeacher ? 'green' : 'red'}">${esc(slot.reliefTeacher) || 'BELUM DITETAPKAN'}</td><td>${esc(slot.note) || ''}</td></tr>`;
+        slots.push({ pid, time: `${period.start || ''}–${period.end || ''}`, ...slot });
       });
     });
-  });
+    slots.sort((a, b) => {
+      const ai = parseInt(a.pid, 10), bi = parseInt(b.pid, 10);
+      return (!isNaN(ai) && !isNaN(bi)) ? ai - bi : String(a.pid).localeCompare(String(b.pid));
+    });
+    const rows = slots.map(slot => `<tr><td>${esc(slot.pid)}</td><td>${esc(slot.time)}</td><td>${esc(slot.className)}</td><td>${esc(slot.subject) || '—'}</td>
+      <td class="${slot.reliefTeacher ? 'green' : 'red'}">${esc(slot.reliefTeacher) || 'BELUM DITETAPKAN'}</td><td>${esc(slot.note) || ''}</td></tr>`).join('');
+    return `<div class="pdf-group">
+      <div class="pdf-group-head" style="color:${color};border-color:${color};">
+        ${esc(t.name)}${reason ? ` <span class="pdf-group-reason" style="background:${color};">${esc(reason)}</span>` : ''}
+        <span class="pdf-group-count">· ${slots.length} slot</span>
+      </div>
+      <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }).join('');
+
   const html = `<div class="pdf-title">Jadual Guru Ganti — ${esc(currentBoard.dayName || '')}</div>
     <div class="pdf-sub">${esc(getDate())}</div>
-    <table><thead><tr><th>Waktu</th><th>Masa</th><th>Kelas</th><th>Subjek</th><th>Tidak Hadir</th><th>Guru Ganti</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>`;
-  await writePrintWindow(win, html, `Jadual-Induk_${getDate()}`);
+    ${groups}`;
+  const branding = await db.getBranding();
+  const filename = buildPdfFilename(currentBoard.dayName, getDate(), branding.subtitle);
+  await writePrintWindow(win, html, filename);
 
   // Jana PDF turut auto-sahkan tapak (elak pentadbir lupa tekan "Sahkan Tapak")
   if (!wasConfirmed) {
